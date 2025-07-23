@@ -1,0 +1,32 @@
+# API Keys and Environment Variables
+.env
+*.env
+.env.local
+.env.production
+
+# Debug and temporary files
+debug_screenshot_*.jpg
+debug_screenshot_*.png
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+mario_env/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
