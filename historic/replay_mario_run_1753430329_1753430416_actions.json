@@ -1,0 +1,842 @@
+[
+  {
+    "timestamp": 0.07858705520629883,
+    "step_count": 0,
+    "position_x": 186,
+    "position_y": 200,
+    "action_name": "wait",
+    "reasoning": "REPLAY: Aucun ennemi n'est visible pour le moment, donc je peux prendre le temps d'observer la situation et me préparer.",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 0.12151598930358887,
+    "step_count": 1,
+    "position_x": 186,
+    "position_y": 200,
+    "action_name": "hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible au-dessus de Mario, à une distance sécuritaire des ennemis. Je peux donc le frapper pour récupérer un power-up.",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 0.16337299346923828,
+    "step_count": 2,
+    "position_x": 186,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "REPLAY: Après avoir récupéré le power-up, je peux avancer prudemment vers la droite pour progresser dans le niveau.",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 0.20686054229736328,
+    "step_count": 3,
+    "position_x": 344,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Il y a un Goomba à environ 25px à droite de Mario, se déplaçant vers lui à 0.5px/step. Il faut attendre que le Goomba passe avant d'avancer pour éviter une collision immédiate.",
+    "mario_speed": 5.266666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.25123023986816406,
+    "step_count": 4,
+    "position_x": 344,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc ? visible à environ 40px au-dessus de Mario. Comme la zone est sécurisée après avoir attendu le Goomba, Mario peut s'approcher et frapper le bloc pour récupérer un power-up.",
+    "mario_speed": 5.266666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.30083560943603516,
+    "step_count": 5,
+    "position_x": 498,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, ce qui est une distance critique. Il faut attendre qu'il passe avant de pouvoir avancer en sécurité.",
+    "mario_speed": 15.266666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.3365824222564697,
+    "step_count": 6,
+    "position_x": 498,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible et la zone est sécurisée, donc on peut le frapper pour récupérer un power-up.",
+    "mario_speed": 15.266666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.3746373653411865,
+    "step_count": 7,
+    "position_x": 638,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, ce qui est une distance critique. Il faut attendre qu'il passe avant de pouvoir avancer en sécurité.",
+    "mario_speed": 4.666666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.4149448871612549,
+    "step_count": 8,
+    "position_x": 638,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible et la zone est sécurisée pour le moment. Mario peut s'approcher et le frapper pour récupérer le power-up.",
+    "mario_speed": 4.666666666666667,
+    "score": 0
+  },
+  {
+    "timestamp": 0.456740140914917,
+    "step_count": 9,
+    "position_x": 778,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas encore une menace immédiate. Il faut attendre qu'il se rapproche un peu plus avant d'agir.",
+    "mario_speed": 4.666666666666667,
+    "score": 1
+  },
+  {
+    "timestamp": 0.496870756149292,
+    "step_count": 10,
+    "position_x": 778,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 50px à droite de Mario. Comme la zone est sécurisée pour le moment, on peut s'approcher et le frapper pour récupérer son contenu.",
+    "mario_speed": 4.666666666666667,
+    "score": 1
+  },
+  {
+    "timestamp": 0.5410687923431396,
+    "step_count": 11,
+    "position_x": 888,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Aucun ennemi détecté dans la zone visible, attendre une menace potentielle",
+    "mario_speed": 3.6666666666666665,
+    "score": 1
+  },
+  {
+    "timestamp": 0.5854313373565674,
+    "step_count": 12,
+    "position_x": 888,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Bloc ? à 0px de distance, le frapper pour obtenir un power-up",
+    "mario_speed": 3.6666666666666665,
+    "score": 2
+  },
+  {
+    "timestamp": 0.6208233833312988,
+    "step_count": 13,
+    "position_x": 1016,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 4.266666666666667,
+    "score": 2
+  },
+  {
+    "timestamp": 0.6629886627197266,
+    "step_count": 14,
+    "position_x": 1016,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc ? visible à environ 20px devant Mario, dans une zone sécurisée. Il faut s'en approcher et le frapper pour récupérer le power-up.",
+    "mario_speed": 4.266666666666667,
+    "score": 2
+  },
+  {
+    "timestamp": 0.7048988342285156,
+    "step_count": 15,
+    "position_x": 1142,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 4.2,
+    "score": 3
+  },
+  {
+    "timestamp": 0.7498886585235596,
+    "step_count": 16,
+    "position_x": 1142,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Le bloc question mark est à environ 20px de Mario et la zone est sécurisée, donc il est possible de le frapper en toute sécurité.",
+    "mario_speed": 4.2,
+    "score": 3
+  },
+  {
+    "timestamp": 0.7933223247528076,
+    "step_count": 17,
+    "position_x": 1282,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que le Goomba passe avant de pouvoir avancer en toute sécurité.",
+    "mario_speed": 4.666666666666667,
+    "score": 4
+  },
+  {
+    "timestamp": 0.8377335071563721,
+    "step_count": 18,
+    "position_x": 1282,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 50px à droite de Mario. Comme la zone est sécurisée pour le moment, on peut s'approcher et frapper le bloc pour récupérer un power-up.",
+    "mario_speed": 4.666666666666667,
+    "score": 4
+  },
+  {
+    "timestamp": 0.8808987140655518,
+    "step_count": 19,
+    "position_x": 1424,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 4.733333333333333,
+    "score": 4
+  },
+  {
+    "timestamp": 0.9188637733459473,
+    "step_count": 20,
+    "position_x": 1424,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc ? visible à environ 50px à droite de Mario. C'est une opportunité de collecter un power-up ou une pièce, mais il faut d'abord s'assurer que la zone est sécurisée.",
+    "mario_speed": 4.733333333333333,
+    "score": 5
+  },
+  {
+    "timestamp": 0.9631092548370361,
+    "step_count": 21,
+    "position_x": 1574,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 5.0,
+    "score": 5
+  },
+  {
+    "timestamp": 1.0049138069152832,
+    "step_count": 22,
+    "position_x": 1574,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Le bloc question mark le plus proche est à environ 50px de Mario, dans une zone sécurisée. Il est donc possible de s'en approcher et de le frapper pour récupérer un power-up.",
+    "mario_speed": 5.0,
+    "score": 6
+  },
+  {
+    "timestamp": 1.04884672164917,
+    "step_count": 23,
+    "position_x": 1702,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 4.266666666666667,
+    "score": 7
+  },
+  {
+    "timestamp": 1.0972049236297607,
+    "step_count": 24,
+    "position_x": 1702,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Le bloc question mark le plus proche est sécurisé, à environ 20px de Mario. Il est donc possible de s'en approcher et de le frapper pour récupérer un power-up.",
+    "mario_speed": 4.266666666666667,
+    "score": 7
+  },
+  {
+    "timestamp": 1.1407241821289062,
+    "step_count": 25,
+    "position_x": 1856,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 5.133333333333334,
+    "score": 8
+  },
+  {
+    "timestamp": 1.1807458400726318,
+    "step_count": 26,
+    "position_x": 1856,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 20px devant Mario, dans une zone sécurisée. Il faut s'en approcher et le frapper pour récupérer le power-up.",
+    "mario_speed": 5.133333333333334,
+    "score": 9
+  },
+  {
+    "timestamp": 1.2237792015075684,
+    "step_count": 27,
+    "position_x": 2000,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 4.8,
+    "score": 10
+  },
+  {
+    "timestamp": 1.2648286819458008,
+    "step_count": 28,
+    "position_x": 2000,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Le bloc question mark est visible et à une distance sécurisée des ennemis (>50px). Il est donc sûr de s'en approcher et de le frapper pour récupérer le power-up.",
+    "mario_speed": 4.8,
+    "score": 11
+  },
+  {
+    "timestamp": 1.305039405822754,
+    "step_count": 29,
+    "position_x": 2154,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il est préférable d'attendre qu'il passe avant de continuer.",
+    "mario_speed": 5.133333333333334,
+    "score": 12
+  },
+  {
+    "timestamp": 1.3491928577423096,
+    "step_count": 30,
+    "position_x": 2154,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 50px à droite de Mario. C'est une opportunité sécurisée de le frapper pour récupérer un power-up.",
+    "mario_speed": 5.133333333333334,
+    "score": 12
+  },
+  {
+    "timestamp": 1.3935518264770508,
+    "step_count": 31,
+    "position_x": 2304,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Goomba est à ~30px à gauche de Mario, se déplaçant lentement vers lui. Attendre que l'ennemi passe est la meilleure option pour éviter une collision immédiate.",
+    "mario_speed": 5.0,
+    "score": 13
+  },
+  {
+    "timestamp": 1.4374523162841797,
+    "step_count": 32,
+    "position_x": 2304,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 50px à droite de Mario. Avec l'ennemi éloigné, c'est le bon moment pour aller récupérer le power-up en frappant le bloc.",
+    "mario_speed": 5.0,
+    "score": 14
+  },
+  {
+    "timestamp": 1.4819178581237793,
+    "step_count": 33,
+    "position_x": 2466,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 5.4,
+    "score": 15
+  },
+  {
+    "timestamp": 1.525743007659912,
+    "step_count": 34,
+    "position_x": 2466,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Le bloc question mark est visible et à une distance sécurisée des ennemis (>50px). Il est donc sûr de s'en approcher et de le frapper pour récupérer un power-up.",
+    "mario_speed": 5.4,
+    "score": 16
+  },
+  {
+    "timestamp": 1.567495346069336,
+    "step_count": 35,
+    "position_x": 2664,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px de Mario, donc il n'est pas encore une menace immédiate. Il faut attendre qu'il se rapproche un peu plus pour pouvoir le stomp en toute sécurité.",
+    "mario_speed": 6.6,
+    "score": 18
+  },
+  {
+    "timestamp": 1.6098136901855469,
+    "step_count": 36,
+    "position_x": 2664,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible et la zone est sécurisée pour le moment. Mario peut s'approcher et le frapper pour récupérer le power-up.",
+    "mario_speed": 6.6,
+    "score": 19
+  },
+  {
+    "timestamp": 1.6516788005828857,
+    "step_count": 37,
+    "position_x": 2830,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30 pixels de Mario, donc il n'est pas une menace immédiate. Il est préférable d'attendre qu'il passe avant de continuer.",
+    "mario_speed": 5.533333333333333,
+    "score": 20
+  },
+  {
+    "timestamp": 1.6937103271484375,
+    "step_count": 38,
+    "position_x": 2830,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible et la zone est sécurisée, donc Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 5.533333333333333,
+    "score": 21
+  },
+  {
+    "timestamp": 1.7371249198913574,
+    "step_count": 39,
+    "position_x": 2996,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Le Goomba est à environ 30px à droite de Mario, se déplaçant lentement vers lui. Attendre que l'ennemi passe est la meilleure option pour rester en sécurité pour le moment.",
+    "mario_speed": 5.533333333333333,
+    "score": 21
+  },
+  {
+    "timestamp": 1.7814807891845703,
+    "step_count": 40,
+    "position_x": 2996,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: Il y a un bloc question mark visible à environ 50px à droite de Mario, dans une zone sécurisée. Approcher et frapper ce bloc pour récupérer un power-up est une bonne prochaine étape une fois le Goomba passé.",
+    "mario_speed": 5.533333333333333,
+    "score": 22
+  },
+  {
+    "timestamp": 1.8233530521392822,
+    "step_count": 41,
+    "position_x": 3098,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "REPLAY: Mario se déplace rapidement vers la gauche, donc continuer dans cette direction pour éviter les ennemis",
+    "mario_speed": 3.4,
+    "score": 23
+  },
+  {
+    "timestamp": 1.8657152652740479,
+    "step_count": 42,
+    "position_x": 3228,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "REPLAY: Goomba is ~25px away, moving towards Mario. Wait for it to pass before advancing to avoid immediate danger.",
+    "mario_speed": 7.733333333333333,
+    "score": 25
+  },
+  {
+    "timestamp": 1.907696008682251,
+    "step_count": 43,
+    "position_x": 3228,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "REPLAY: There is a blue question mark block visible and the area is currently safe, so Mario can approach and hit the block to collect the item inside.",
+    "mario_speed": 4.333333333333333,
+    "score": 26
+  },
+  {
+    "timestamp": 3.6505792140960693,
+    "step_count": 85,
+    "position_x": 210,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Il y a un Goomba à environ 30px à droite de Mario, qui se déplace vers lui. Il faut attendre que l'ennemi passe avant de pouvoir avancer en sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 53
+  },
+  {
+    "timestamp": 4.081662178039551,
+    "step_count": 85,
+    "position_x": 210,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible et la zone est sécurisée pour le moment. Mario peut s'approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 53
+  },
+  {
+    "timestamp": 7.114779710769653,
+    "step_count": 169,
+    "position_x": 378,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Il y a un Goomba à environ 30px à droite de Mario, se déplaçant vers lui. Il faut attendre qu'il passe avant d'avancer pour éviter une collision.",
+    "mario_speed": 0.13333333333333333,
+    "score": 125
+  },
+  {
+    "timestamp": 7.548875093460083,
+    "step_count": 169,
+    "position_x": 378,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible et la zone est sécurisée, donc Mario peut s'approcher et le frapper pour récupérer le power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 125
+  },
+  {
+    "timestamp": 10.575599431991577,
+    "step_count": 250,
+    "position_x": 540,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 25 pixels de Mario, ce qui est une distance critique. Il faut attendre que l'ennemi passe avant de pouvoir avancer en sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 196
+  },
+  {
+    "timestamp": 11.000969171524048,
+    "step_count": 250,
+    "position_x": 540,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible à environ 50 pixels à droite de Mario, dans une zone sécurisée. Il est possible de s'en approcher et de le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 196
+  },
+  {
+    "timestamp": 14.053406715393066,
+    "step_count": 332,
+    "position_x": 704,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que le Goomba passe avant de pouvoir avancer en toute sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 250
+  },
+  {
+    "timestamp": 14.481324911117554,
+    "step_count": 332,
+    "position_x": 704,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible à environ 50px à droite de Mario. Comme il n'y a pas d'ennemi immédiatement dangereux, on peut s'approcher et frapper ce bloc pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 250
+  },
+  {
+    "timestamp": 17.854552030563354,
+    "step_count": 422,
+    "position_x": 884,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que l'ennemi passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 262
+  },
+  {
+    "timestamp": 18.277373790740967,
+    "step_count": 422,
+    "position_x": 884,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark le plus proche est à environ 50px de Mario, ce qui est une distance sûre pour le collecter. L'action 'approach_and_hit_block' permettra de récupérer le power-up en toute sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 262
+  },
+  {
+    "timestamp": 20.633247137069702,
+    "step_count": 490,
+    "position_x": 1020,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 328
+  },
+  {
+    "timestamp": 21.051401376724243,
+    "step_count": 490,
+    "position_x": 1020,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est à environ 50px de Mario, une distance sûre. Il est possible de s'en approcher et de le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 328
+  },
+  {
+    "timestamp": 25.022502422332764,
+    "step_count": 596,
+    "position_x": 1232,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que l'ennemi passe avant de pouvoir avancer en toute sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 365
+  },
+  {
+    "timestamp": 25.441163778305054,
+    "step_count": 596,
+    "position_x": 1232,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible à environ 50px à droite de Mario. Comme la zone est sécurisée pour le moment, on peut s'approcher et frapper le bloc pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 365
+  },
+  {
+    "timestamp": 28.976666927337646,
+    "step_count": 689,
+    "position_x": 1418,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 414
+  },
+  {
+    "timestamp": 29.361146926879883,
+    "step_count": 689,
+    "position_x": 1418,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible et la zone est sécurisée, donc on peut s'en approcher et le frapper pour récupérer son contenu.",
+    "mario_speed": 0.13333333333333333,
+    "score": 414
+  },
+  {
+    "timestamp": 32.30316781997681,
+    "step_count": 771,
+    "position_x": 1582,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant d'avancer.",
+    "mario_speed": 0.13333333333333333,
+    "score": 485
+  },
+  {
+    "timestamp": 32.73264455795288,
+    "step_count": 771,
+    "position_x": 1582,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est visible et à une distance sûre d'environ 50px. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 485
+  },
+  {
+    "timestamp": 35.3595244884491,
+    "step_count": 845,
+    "position_x": 1730,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 540
+  },
+  {
+    "timestamp": 35.78554964065552,
+    "step_count": 845,
+    "position_x": 1730,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est visible et à une distance sécurisée d'environ 50px. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 540
+  },
+  {
+    "timestamp": 38.46096897125244,
+    "step_count": 918,
+    "position_x": 1876,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 618
+  },
+  {
+    "timestamp": 38.88888144493103,
+    "step_count": 918,
+    "position_x": 1876,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est visible et à une distance sûre d'environ 50px. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 618
+  },
+  {
+    "timestamp": 41.51717233657837,
+    "step_count": 990,
+    "position_x": 2020,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Il y a un Goomba à environ 30px à droite de Mario, qui se déplace lentement vers lui. Il est préférable d'attendre que l'ennemi passe avant de continuer.",
+    "mario_speed": 0.13333333333333333,
+    "score": 646
+  },
+  {
+    "timestamp": 41.9455783367157,
+    "step_count": 990,
+    "position_x": 2020,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible et la zone est sécurisée, donc Mario peut s'approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 646
+  },
+  {
+    "timestamp": 44.356528759002686,
+    "step_count": 1059,
+    "position_x": 2158,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que l'ennemi passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 719
+  },
+  {
+    "timestamp": 44.77695846557617,
+    "step_count": 1059,
+    "position_x": 2158,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark le plus proche est à une distance sécurisée et accessible. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 719
+  },
+  {
+    "timestamp": 47.919575452804565,
+    "step_count": 1146,
+    "position_x": 2332,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 25 pixels de Mario, ce qui est une distance critique. Il faut attendre qu'il passe avant de pouvoir avancer en sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 801
+  },
+  {
+    "timestamp": 51.033416509628296,
+    "step_count": 1222,
+    "position_x": 2484,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30 pixels de Mario, ce qui est une distance sûre pour le moment. Il faut attendre que le Goomba passe avant de pouvoir avancer en toute sécurité.",
+    "mario_speed": 0.13333333333333333,
+    "score": 797
+  },
+  {
+    "timestamp": 51.46154236793518,
+    "step_count": 1222,
+    "position_x": 2484,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible et la zone est sécurisée, donc on peut s'en approcher et le frapper pour récupérer son contenu (pièces, power-up).",
+    "mario_speed": 0.13333333333333333,
+    "score": 797
+  },
+  {
+    "timestamp": 53.88094234466553,
+    "step_count": 1289,
+    "position_x": 2618,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30 pixels de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de continuer.",
+    "mario_speed": 0.13333333333333333,
+    "score": 823
+  },
+  {
+    "timestamp": 54.30264401435852,
+    "step_count": 1289,
+    "position_x": 2618,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est visible et à une distance sûre d'environ 50 pixels. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 823
+  },
+  {
+    "timestamp": 56.452553272247314,
+    "step_count": 1350,
+    "position_x": 2740,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, ce qui est une distance sûre pour le moment. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 882
+  },
+  {
+    "timestamp": 56.862874269485474,
+    "step_count": 1350,
+    "position_x": 2740,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est visible et à une distance sécurisée. Mario peut s'en approcher et le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 882
+  },
+  {
+    "timestamp": 59.880884408950806,
+    "step_count": 1431,
+    "position_x": 2902,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Il y a un Goomba à environ 25px à droite de Mario, se déplaçant vers lui à 0.5px/step. Attendre que le Goomba passe est la meilleure option pour éviter une collision imminente.",
+    "mario_speed": 0.13333333333333333,
+    "score": 1010
+  },
+  {
+    "timestamp": 63.41439151763916,
+    "step_count": 1493,
+    "position_x": 3026,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Il y a un Goomba à environ 30px à droite de Mario, se déplaçant vers lui à 0.5px/step. Attendre que le Goomba passe est la meilleure option pour éviter un danger immédiat.",
+    "mario_speed": 0.13333333333333333,
+    "score": 999
+  },
+  {
+    "timestamp": 63.83686852455139,
+    "step_count": 1493,
+    "position_x": 3026,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc ? visible à environ 50px à droite de Mario, dans une zone sécurisée. Approcher et frapper ce bloc est une bonne opportunité de collecter un power-up sans risque.",
+    "mario_speed": 0.13333333333333333,
+    "score": 999
+  },
+  {
+    "timestamp": 66.81358623504639,
+    "step_count": 1575,
+    "position_x": 3190,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 1071
+  },
+  {
+    "timestamp": 67.24486255645752,
+    "step_count": 1575,
+    "position_x": 3190,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Il y a un bloc question mark visible à environ 20px devant Mario. Comme la zone est sécurisée, on peut s'approcher et le frapper pour récupérer son contenu.",
+    "mario_speed": 0.13333333333333333,
+    "score": 1071
+  },
+  {
+    "timestamp": 79.74504399299622,
+    "step_count": 1856,
+    "position_x": 3752,
+    "position_y": 200,
+    "action_name": "wait_for_enemy",
+    "reasoning": "Le Goomba est à environ 30px de Mario, donc il n'est pas une menace immédiate. Il faut attendre qu'il passe avant de progresser.",
+    "mario_speed": 0.13333333333333333,
+    "score": 1132
+  },
+  {
+    "timestamp": 80.10853934288025,
+    "step_count": 1856,
+    "position_x": 3752,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Le bloc question mark est à environ 20px de Mario et la zone est sécurisée, donc il est possible de le frapper pour récupérer un power-up.",
+    "mario_speed": 0.13333333333333333,
+    "score": 1132
+  }
+]

@@ -20,6 +20,10 @@ import base64
 from PIL import Image
 import io
 import tempfile
+from typing import Dict, Any
+from mario_history_manager import MarioHistoryManager
+from mario_logger import MarioLogger
+from mario_level_database import MarioLevelDatabase
 
 class MarioFluidLLM:
     def __init__(self):
@@ -115,6 +119,25 @@ class MarioFluidLLM:
         self.last_actions_before_death = deque(maxlen=10)  # Actions juste avant de mourir
         self.repeated_failures = {}  # Compteur d'échecs répétés
         
+        # Gestionnaire d'historique persistant
+        self.history_manager = MarioHistoryManager()
+        self.current_run_started = False
+        
+        # Système de logging
+        self.logger = MarioLogger()
+        
+        # Base de données des niveaux
+        self.level_db = MarioLevelDatabase()
+        self.current_world = 1
+        self.current_level = 1
+        self.level_detection_confidence = 0
+        
+        # Système de replay
+        self.replay_mode = False
+        self.replay_actions = []
+        self.replay_index = 0
+        self.replay_ai_takeover_point = 0  # Point où l'IA reprend la main
+        
         # Système hybride optimisé screenshot + positions
         self.level_context_established = False  # Si Claude a la carte du niveau
         self.last_positions_update = 0  # Dernière mise à jour des positions
@@ -159,6 +182,10 @@ class MarioFluidLLM:
         else:
             # Mode classique RGB (si screenshots désactivés)
             screen_analysis = self.analyze_visual_context(obs, step_count)
+        
+        # Détecter le niveau actuel si confiance faible
+        if self.level_detection_confidence < 80:
+            self.detect_current_level(mario_x, step_count, screen_analysis)
         
         return {
             'mario': {'x': mario_x, 'y': mario_y, 'score': score},
@@ -421,6 +448,147 @@ class MarioFluidLLM:
         
         return results
     
+    def detect_current_level(self, mario_x: int, step_count: int, screen_analysis: Dict) -> None:
+        """Détecter le niveau actuel basé sur les données de jeu"""
+        try:
+            # Heuristiques de détection du niveau
+            confidence_points = 0
+            detected_world = 1
+            detected_level = 1
+            
+            # Détection basée sur le nom de l'environnement
+            env_name = str(self.env.spec.id) if hasattr(self.env, 'spec') else ""
+            if "1-1" in env_name:
+                detected_world, detected_level = 1, 1
+                confidence_points += 50
+            elif "1-2" in env_name:
+                detected_world, detected_level = 1, 2
+                confidence_points += 50
+            
+            # Détection basée sur les éléments visuels
+            level_type = "OVERWORLD"  # Par défaut
+            
+            # Détection souterraine (couleurs plus sombres)
+            if screen_analysis.get('underground', False):
+                level_type = "UNDERGROUND"
+                confidence_points += 20
+                # Probablement 1-2 si monde 1
+                if detected_world == 1:
+                    detected_level = 2
+                    confidence_points += 20
+            
+            # Détection château (Fire Bars, Bowser)
+            if any('fire' in feature.lower() for feature in screen_analysis.get('level_map', [])):
+                level_type = "CASTLE"
+                confidence_points += 30
+                # Probablement x-4
+                detected_level = 4
+                confidence_points += 20
+            
+            # Détection aquatique (si implémenté)
+            if screen_analysis.get('environment_type') == 'underwater':
+                level_type = "UNDERWATER"
+                confidence_points += 30
+                detected_level = 2  # Généralement x-2
+                confidence_points += 15
+            
+            # Détection basée sur la progression Mario
+            if mario_x > 3000:  # Mario a beaucoup progressé
+                confidence_points += 10
+            
+            # Mettre à jour si confiance suffisante
+            if confidence_points > self.level_detection_confidence:
+                self.current_world = detected_world
+                self.current_level = detected_level
+                self.level_detection_confidence = confidence_points
+                
+                # Logger la détection
+                self.logger.log_game_event("LEVEL_DETECTED", step_count, {
+                    "world": detected_world,
+                    "level": detected_level,
+                    "confidence": confidence_points,
+                    "level_type": level_type
+                })
+                
+                print(f"🗺️ Niveau détecté: World {detected_world}-{detected_level} (confiance: {confidence_points}%)")
+        
+        except Exception as e:
+            self.logger.log_error("LEVEL_DETECTION", str(e), step_count)
+    
+    def get_level_specific_context(self) -> str:
+        """Générer le contexte spécifique au niveau actuel"""
+        level_data = self.level_db.get_level_data(self.current_world, self.current_level)
+        
+        if not level_data:
+            return "Niveau générique - informations limitées disponibles."
+        
+        context_parts = []
+        
+        # Informations générales du niveau
+        context_parts.append(f"🗺️ NIVEAU: World {level_data.world}-{level_data.level} ({level_data.level_type})")
+        context_parts.append(f"⏱️ Temps limite: {level_data.time_limit} secondes")
+        context_parts.append(f"🎵 Musique: {level_data.background_music}")
+        
+        # Ennemis spécifiques à ce niveau
+        if level_data.enemies:
+            context_parts.append(f"\n👾 ENNEMIS CONFIRMÉS DANS CE NIVEAU:")
+            for enemy in level_data.enemies:
+                threat_emoji = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴", "CRITICAL": "💀"}[enemy.threat_level]
+                context_parts.append(f"   {threat_emoji} {enemy.name}: {enemy.behavior} (Vitesse: {enemy.speed}px/step)")
+                context_parts.append(f"      Élimination: {', '.join(enemy.defeat_methods)} | Points: {enemy.points}")
+                if enemy.special_notes:
+                    context_parts.append(f"      ⚠️ {enemy.special_notes}")
+        
+        # Blocs et éléments interactifs
+        if level_data.blocks:
+            context_parts.append(f"\n🧱 BLOCS ET ÉLÉMENTS INTERACTIFS:")
+            for block in level_data.blocks:
+                context_parts.append(f"   📦 {block.name}: {block.contents}")
+                context_parts.append(f"      Comportement: {block.behavior}")
+                if block.special_notes:
+                    context_parts.append(f"      💡 {block.special_notes}")
+        
+        # Power-ups disponibles
+        if level_data.power_ups:
+            context_parts.append(f"\n⭐ POWER-UPS DISPONIBLES:")
+            for powerup in level_data.power_ups:
+                rarity_emoji = {"COMMON": "🟢", "RARE": "🟡", "VERY_RARE": "🔴"}[powerup.rarity]
+                context_parts.append(f"   {rarity_emoji} {powerup.name}: {powerup.effect}")
+                if powerup.special_notes:
+                    context_parts.append(f"      💡 {powerup.special_notes}")
+        
+        # Obstacles spécifiques
+        if level_data.obstacles:
+            context_parts.append(f"\n⚠️ OBSTACLES SPÉCIFIQUES:")
+            for obstacle in level_data.obstacles:
+                threat_emoji = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴", "CRITICAL": "💀"}[obstacle.threat_level]
+                context_parts.append(f"   {threat_emoji} {obstacle.name}: {obstacle.avoidance_strategy}")
+                if obstacle.special_notes:
+                    context_parts.append(f"      ⚠️ {obstacle.special_notes}")
+        
+        # Fonctionnalités spéciales
+        if level_data.special_features:
+            context_parts.append(f"\n🌟 CARACTÉRISTIQUES SPÉCIALES:")
+            for feature in level_data.special_features:
+                context_parts.append(f"   ✨ {feature}")
+        
+        # Stratégie recommandée
+        context_parts.append(f"\n🎯 STRATÉGIE RECOMMANDÉE:")
+        context_parts.append(f"   📋 {level_data.completion_strategy}")
+        
+        # Analyse des menaces
+        threat_analysis = self.level_db.get_threat_analysis(self.current_world, self.current_level)
+        context_parts.append(f"\n📊 ANALYSE DES MENACES:")
+        context_parts.append(f"   Niveau max: {threat_analysis['max_threat_level']}")
+        if threat_analysis['high_value_targets']:
+            context_parts.append(f"   🎯 Cibles prioritaires: {', '.join(threat_analysis['high_value_targets'])}")
+        
+        # Power-ups recommandés
+        recommended = self.level_db.get_recommended_powerups(self.current_world, self.current_level)
+        context_parts.append(f"\n💊 POWER-UPS RECOMMANDÉS: {', '.join(recommended)}")
+        
+        return "\n".join(context_parts)
+    
     def find_mario_position(self, game_area):
         """Trouver la position de Mario sur l'écran"""
         try:
@@ -579,6 +747,9 @@ CONTEXTE DÉTAILLÉ MARIO:
 📚 HISTORIQUE D'APPRENTISSAGE - APPRENDS DE TES ERREURS:
 {self.get_learning_context()}
 
+🗺️ INFORMATIONS SPÉCIFIQUES DU NIVEAU ACTUEL:
+{self.get_level_specific_context()}
+
 VITESSES DE RÉFÉRENCE (pour calculs de timing):
 - Goomba: ~0.5 pixels/step vers la gauche
 - Mario marche: ~1-2 pixels/step vers droite  
@@ -674,6 +845,10 @@ Réponds en JSON compact avec analyse de sécurité détaillée:
 
             self.api_calls += 1
             print(f"📸 Envoi screenshot à Claude (appel #{self.api_calls})...")
+            
+            # Logger le prompt
+            self.logger.log_claude_prompt("SCREENSHOT", prompt, step_count)
+            
             print("="*80)
             print("🔍 PROMPT ENVOYÉ À CLAUDE:")
             print(prompt)
@@ -698,15 +873,19 @@ Réponds en JSON compact avec analyse de sécurité détaillée:
             
             response_text = response.content[0].text
             print(f"✅ Claude analyse reçue ({len(response_text)} chars)")
+            
+            # Calculer le coût d'abord
+            image_cost = min(0.01, len(screenshot_b64) * 0.000001)  # Coût proportionnel à la taille
+            text_cost = len(prompt) * 0.25 / 1000000 + len(response_text) * 1.25 / 1000000
+            cost = text_cost + image_cost
+            
+            # Logger la réponse avec coût calculé
+            self.logger.log_claude_response(response_text, step_count, cost)
+            
             print("="*80)
             print("💭 RÉPONSE DE CLAUDE:")
             print(response_text)
             print("="*80)
-            
-            # Coût plus élevé pour les images (estimé selon la taille optimisée)
-            image_cost = min(0.01, len(screenshot_b64) * 0.000001)  # Coût proportionnel à la taille
-            text_cost = len(prompt) * 0.25 / 1000000 + len(response_text) * 1.25 / 1000000
-            cost = text_cost + image_cost
             
             self.total_cost += cost
             self.screenshot_costs += image_cost
@@ -721,7 +900,15 @@ Réponds en JSON compact avec analyse de sécurité détaillée:
             return response_text
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"❌ Erreur analyse screenshot: {e}")
+            print(f"🔍 Détails de l'erreur:")
+            print(error_details)
+            
+            # Logger l'erreur avec détails
+            self.logger.log_error("CLAUDE_API_FAILURE", f"{str(e)} | Traceback: {error_details}", step_count)
+            
             return None
     
     def create_claude_prompt(self, situation):
@@ -756,7 +943,10 @@ Réponds en JSON compact avec analyse de sécurité détaillée:
 🎮 ACTIONS MARIO BROS DISPONIBLES:
 {chr(10).join(macro_list)}
 
-🧠 STRATÉGIES MARIO BROS:
+🗺️ CONTEXTE SPÉCIFIQUE AU NIVEAU:
+{self.get_level_specific_context()}
+
+🧠 STRATÉGIES MARIO BROS GÉNÉRALES:
 • Stomp enemies (Goomba/Koopa) en sautant dessus pour les tuer et gagner points
 • Hit blocks ? par dessous pour obtenir coins/power-ups/champignons
 • Collect power-ups pour devenir Super Mario ou Fire Mario
@@ -801,6 +991,9 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"retreat_and_jump","reasoning":
             self.api_calls += 1
             print(f"🧠 Claude réfléchit... (appel #{self.api_calls})")
             
+            # Logger le prompt
+            self.logger.log_claude_prompt("TEXT", prompt, 0)
+            
             response = self.claude_client.messages.create(
                 model="claude-3-haiku-20240307",
                 max_tokens=120,  # Plus court pour éviter la troncature
@@ -814,10 +1007,21 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"retreat_and_jump","reasoning":
             cost = len(prompt) * 0.25 / 1000000 + len(response_text) * 1.25 / 1000000
             self.total_cost += cost
             
+            # Logger la réponse
+            self.logger.log_claude_response(response_text, 0, cost)
+            
             return response_text
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"❌ Erreur Claude: {e}")
+            print(f"🔍 Détails de l'erreur:")
+            print(error_details)
+            
+            # Logger l'erreur avec détails
+            self.logger.log_error("CLAUDE_MACRO_API_FAILURE", f"{str(e)} | Traceback: {error_details}", 0)
+            
             return None
     
     def call_claude_async(self, situation, obs=None, step_count=0):
@@ -1160,24 +1364,40 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"retreat_and_jump","reasoning":
             cv2.putText(canvas, stat, (680, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.45, GREEN, 1)
             y_pos += 18
         
-        # Macro actuelle et queue
+        # Mode de jeu et action actuelle
         y_pos += 20
-        cv2.putText(canvas, "🎯 ACTION ACTUELLE:", (680, y_pos), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2)
-        
-        y_pos += 25
-        if self.current_macro:
-            macro_name = self.current_macro['name']
-            frames_left = self.current_macro['frames_left']
-            cv2.putText(canvas, f"Macro: {macro_name}", (680, y_pos), 
+        if self.replay_mode:
+            cv2.putText(canvas, "🔄 MODE REPLAY:", (680, y_pos), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, CYAN, 2)
+            y_pos += 25
+            replay_progress = f"{self.replay_index}/{len(self.replay_actions)}"
+            cv2.putText(canvas, f"Progression: {replay_progress}", (680, y_pos), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, CYAN, 1)
             y_pos += 18
-            cv2.putText(canvas, f"Frames restantes: {frames_left}", (680, y_pos), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, ORANGE, 1)
+            if self.replay_index < len(self.replay_actions):
+                current_replay_action = self.replay_actions[self.replay_index]['action_name'] if self.replay_index < len(self.replay_actions) else "Terminé"
+                cv2.putText(canvas, f"Action: {current_replay_action}", (680, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, ORANGE, 1)
+            else:
+                cv2.putText(canvas, "🤖 IA prend la main", (680, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, GREEN, 1)
         else:
-            thinking_status = "🧠 Réfléchit..." if self.claude_thinking else "⚡ Prêt"
-            cv2.putText(canvas, thinking_status, (680, y_pos), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, ORANGE, 1)
+            cv2.putText(canvas, "🎯 ACTION ACTUELLE:", (680, y_pos), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, YELLOW, 2)
+            
+            y_pos += 25
+            if self.current_macro:
+                macro_name = self.current_macro['name']
+                frames_left = self.current_macro['frames_left']
+                cv2.putText(canvas, f"Macro: {macro_name}", (680, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, CYAN, 1)
+                y_pos += 18
+                cv2.putText(canvas, f"Frames restantes: {frames_left}", (680, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, ORANGE, 1)
+            else:
+                thinking_status = "🧠 Réfléchit..." if self.claude_thinking else "⚡ Prêt"
+                cv2.putText(canvas, thinking_status, (680, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, ORANGE, 1)
         
         y_pos += 20
         cv2.putText(canvas, f"Queue: {len(self.action_queue)} actions", (680, y_pos), 
@@ -1276,17 +1496,44 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"retreat_and_jump","reasoning":
     
     def record_action(self, action_name, situation, step_count, reasoning=""):
         """Enregistrer une action dans l'historique pour apprentissage"""
+        mario = situation.get('mario', {})
+        progress = situation.get('progress', {})
+        
         action_record = {
             'timestamp': step_count,
             'action': action_name,
-            'mario_position': situation.get('mario', {}).get('x', 0),
-            'mario_y': situation.get('mario', {}).get('y', 0),
-            'progress_status': situation.get('progress', {}).get('status', 'unknown'),
+            'mario_position': mario.get('x', 0),
+            'mario_y': mario.get('y', 0),
+            'progress_status': progress.get('status', 'unknown'),
             'reasoning': reasoning,
             'lives_remaining': situation.get('lives', 3)
         }
         self.action_history.append(action_record)
         self.last_actions_before_death.append(action_record)
+        
+        # Enregistrer aussi dans l'historique persistant
+        mario_speed = progress.get('trend', 0) / 30.0 if progress.get('trend') else 0  # pixels/step en moyenne
+        self.history_manager.record_action(
+            step_count=step_count,
+            position_x=mario.get('x', 0),
+            position_y=mario.get('y', 0),
+            action_name=action_name,
+            reasoning=reasoning,
+            mario_speed=mario_speed,
+            score=mario.get('score', 0)
+        )
+        
+        # Logger l'action
+        source = "REPLAY" if "REPLAY:" in reasoning else "AI" if reasoning else "EMERGENCY"
+        self.logger.log_action(
+            step_count=step_count,
+            action_name=action_name,
+            reasoning=reasoning,
+            position_x=mario.get('x', 0),
+            position_y=mario.get('y', 0),
+            score=mario.get('score', 0),
+            source=source
+        )
     
     def record_death(self, death_step, death_position):
         """Enregistrer une mort pour analyse des patterns d'échec"""
@@ -1530,6 +1777,9 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 📚 HISTORIQUE D'APPRENTISSAGE:
 {learning_context}
 
+🗺️ CONTEXTE DU NIVEAU ACTUEL:
+{self.get_level_specific_context()}
+
 🎯 DÉCISION RAPIDE REQUISE:
 Basé sur ces positions exactes et ton contexte du niveau, choisis 2-3 actions IMMÉDIATES.
 
@@ -1550,6 +1800,10 @@ Réponds en JSON compact:
             
             self.api_calls += 1
             print(f"📍 Envoi mise à jour positionnelle à Claude (appel #{self.api_calls})...")
+            
+            # Logger le prompt
+            self.logger.log_claude_prompt("POSITIONS", prompt, step_count)
+            
             print("="*50)
             print("🔍 PROMPT POSITIONS ENVOYÉ À CLAUDE:")
             print(prompt)
@@ -1567,21 +1821,33 @@ Réponds en JSON compact:
             
             response_text = response.content[0].text if response.content else ""
             
+            # Coût estimé pour mise à jour textuelle (beaucoup moins cher qu'une image)
+            estimated_cost = 0.001  # $0.001 vs $0.01 pour screenshot
+            self.total_cost += estimated_cost
+            
+            # Logger la réponse
+            self.logger.log_claude_response(response_text, step_count, estimated_cost)
+            
             print("✅ Claude analyse reçue (texte)", f"({len(response_text)} chars)")
             print("="*50)
             print("💭 RÉPONSE DE CLAUDE:")
             print(response_text)
             print("="*50)
             
-            # Coût estimé pour mise à jour textuelle (beaucoup moins cher qu'une image)
-            estimated_cost = 0.001  # $0.001 vs $0.01 pour screenshot
-            self.total_cost += estimated_cost
             print(f"💰 Coût mise à jour: ${estimated_cost:.4f} (total: ${self.total_cost:.3f})")
             
             return response_text
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"❌ Erreur mise à jour positionnelle: {e}")
+            print(f"🔍 Détails de l'erreur:")
+            print(error_details)
+            
+            # Logger l'erreur avec détails
+            self.logger.log_error("CLAUDE_POSITION_API_FAILURE", f"{str(e)} | Traceback: {error_details}", step_count)
+            
             return None
     
     def should_use_screenshot_vs_positions(self, step_count):
@@ -1603,11 +1869,214 @@ Réponds en JSON compact:
         # Sinon, mise à jour positionnelle
         return False, "Conditions normales - mise à jour positionnelle suffisante"
     
+    def show_game_menu(self):
+        """Afficher le menu de sélection du mode de jeu"""
+        print("\n" + "="*60)
+        print("🎮 MARIO FLUIDE - CLAUDE LLM")
+        print("="*60)
+        
+        # Afficher les statistiques
+        stats = self.history_manager.get_run_stats()
+        if stats.get("total_runs", 0) > 0:
+            print(f"📊 Statistiques actuelles:")
+            print(f"   🏃 Runs totaux: {stats['total_runs']}")
+            print(f"   🏆 Meilleure distance: {stats['best_distance']} pixels")
+            print(f"   🚀 Meilleure vitesse: {stats['best_speed']:.2f} px/s")
+            
+            # Afficher les runs disponibles
+            available_runs = self.history_manager.get_available_runs_for_replay()
+            if available_runs:
+                print(f"\n🔄 Runs disponibles pour replay:")
+                for i, run in enumerate(available_runs[:5], 1):  # Afficher les 5 meilleurs
+                    status_emoji = "🏆" if run.completion_status == "victory" else "💀" if run.completion_status == "death" else "⏸️"
+                    print(f"   {i}. {status_emoji} {run.run_id} - {run.max_position_x}px ({run.actions_count} actions)")
+        else:
+            print("📝 Aucun historique trouvé - Première partie!")
+        
+        print("\n🎯 CHOISISSEZ VOTRE MODE:")
+        print("   1️⃣  Nouvelle partie (IA dès le début)")
+        print("   2️⃣  Reprendre de l'historique (replay + IA)")
+        print("   3️⃣  Quitter")
+        
+        try:
+            while True:
+                try:
+                    choice = input("\n👉 Votre choix (1-3): ").strip()
+                except EOFError:
+                    # Mode non-interactif détecté, choix automatique: nouvelle partie
+                    print("Mode non-interactif détecté, sélection automatique: nouvelle partie")
+                    choice = "1"
+                
+                if choice == "1":
+                    self.logger.log_menu_choice("new_game")
+                    return "new_game", None
+                elif choice == "2":
+                    if stats.get("total_runs", 0) == 0:
+                        print("❌ Aucun historique disponible! Nouvelle partie sélectionnée.")
+                        self.logger.log_menu_choice("new_game", "no_history_available")
+                        return "new_game", None
+                    return self.select_replay_run()
+                elif choice == "3":
+                    self.logger.log_menu_choice("quit")
+                    return "quit", None
+                else:
+                    print("❌ Choix invalide! Veuillez entrer 1, 2 ou 3.")
+        except KeyboardInterrupt:
+            return "quit", None
+    
+    def select_replay_run(self):
+        """Sélectionner un run pour le replay"""
+        available_runs = self.history_manager.get_available_runs_for_replay()
+        
+        if not available_runs:
+            print("❌ Aucun run disponible pour replay!")
+            return "new_game", None
+        
+        print(f"\n🔄 SÉLECTION DU RUN À REJOUER:")
+        for i, run in enumerate(available_runs, 1):
+            status_emoji = "🏆" if run.completion_status == "victory" else "💀" if run.completion_status == "death" else "⏸️"
+            print(f"   {i}. {status_emoji} {run.run_id}")
+            print(f"      📍 Distance: {run.max_position_x}px | Actions: {run.actions_count} | Durée: {run.duration:.1f}s")
+        
+        print(f"   0. 🔙 Retour au menu principal")
+        
+        while True:
+            try:
+                choice = input(f"\n👉 Sélectionnez un run (0-{len(available_runs)}): ").strip()
+                
+                if choice == "0":
+                    return self.show_game_menu()  # Retour au menu principal
+                
+                run_index = int(choice) - 1
+                if 0 <= run_index < len(available_runs):
+                    selected_run = available_runs[run_index]
+                    print(f"✅ Run sélectionné: {selected_run.run_id}")
+                    self.logger.log_menu_choice("replay", selected_run.run_id)
+                    return "replay", selected_run.run_id
+                else:
+                    print(f"❌ Choix invalide! Veuillez entrer un nombre entre 0 et {len(available_runs)}.")
+            
+            except (ValueError, KeyboardInterrupt):
+                print("❌ Entrée invalide!")
+    
+    def setup_replay_mode(self, run_id: str):
+        """Configurer le mode replay à partir d'un run existant"""
+        # Charger les actions du run sélectionné
+        actions = self.history_manager.load_run_actions(run_id)
+        
+        if not actions:
+            print(f"❌ Impossible de charger les actions du run {run_id}")
+            return False
+        
+        # Convertir les ActionRecord en format utilisable
+        self.replay_actions = []
+        for action in actions:
+            # Déterminer l'action de base à partir du nom
+            base_action = self.get_base_action_from_name(action.action_name)
+            self.replay_actions.append({
+                'step_count': action.step_count,
+                'action_name': action.action_name,
+                'base_action': base_action,
+                'position_x': action.position_x,
+                'reasoning': action.reasoning
+            })
+        
+        # Définir le point de takeover (3 actions avant la fin)
+        self.replay_ai_takeover_point = max(0, len(self.replay_actions) - 3)
+        
+        self.replay_mode = True
+        self.replay_index = 0
+        
+        print(f"🔄 Mode replay configuré:")
+        print(f"   📽️  Actions à rejouer: {len(self.replay_actions)}")
+        print(f"   🤖 IA reprend à l'action: {self.replay_ai_takeover_point + 1}")
+        print(f"   🎯 Actions replay: {self.replay_ai_takeover_point}")
+        
+        # Créer un nouveau run pour le replay
+        new_run_id = self.history_manager.create_replay_run(run_id)
+        self.current_run_started = True
+        
+        # Logger la configuration du replay
+        self.logger.log_replay_event("SETUP", {
+            "original_run": run_id,
+            "new_run": new_run_id,
+            "actions_count": len(self.replay_actions),
+            "takeover_point": self.replay_ai_takeover_point
+        })
+        
+        return True
+    
+    def get_base_action_from_name(self, action_name: str) -> int:
+        """Convertir le nom d'action en action de base du jeu"""
+        # Mapper les noms d'actions vers les actions de base
+        if action_name in self.macro_actions:
+            return self.macro_actions[action_name]['base_action']
+        
+        # Actions par défaut selon le nom
+        action_mapping = {
+            'walk_right': 1, 'run_forward': 3, 'short_jump': 2, 'high_jump': 5,
+            'long_jump': 4, 'precise_jump': 2, 'step_back': 6, 'wait': 0,
+            'stomp_enemy': 2, 'hit_block': 5, 'approach_and_hit_block': 4,
+            'jump_on_pipe': 4, 'retreat_and_jump': 6
+        }
+        
+        return action_mapping.get(action_name, 1)  # Par défaut: walk_right
+    
+    def get_replay_action(self, current_step):
+        """Obtenir l'action suivante en mode replay"""
+        if not self.replay_mode or self.replay_index >= len(self.replay_actions):
+            return None
+        
+        # Vérifier si on a atteint le point de takeover de l'IA
+        if self.replay_index >= self.replay_ai_takeover_point:
+            progress_info = f"{self.replay_index}/{len(self.replay_actions)}"
+            print(f"🤖 IA reprend la main à l'action {self.replay_index + 1}/{len(self.replay_actions)}")
+            
+            # Logger la transition
+            self.logger.log_ai_takeover(current_step, progress_info)
+            
+            self.replay_mode = False  # Désactiver le replay
+            return None  # L'IA reprend
+        
+        # Obtenir l'action actuelle
+        current_action = self.replay_actions[self.replay_index]
+        
+        print(f"🔄 Replay {self.replay_index + 1}/{len(self.replay_actions)}: {current_action['action_name']} (pos: {current_action['position_x']})")
+        
+        self.replay_index += 1
+        return current_action['base_action']
+    
     def play_fluid_mario(self, max_steps=2000):
         """Jouer avec Mario fluide et Claude intelligent"""
         
-        print("🎮 MARIO FLUIDE avec CLAUDE LLM")
+        # Afficher le menu de sélection
+        game_mode, selected_run_id = self.show_game_menu()
+        
+        if game_mode == "quit":
+            print("👋 Au revoir!")
+            return
+        
+        # Configuration selon le mode
+        if game_mode == "replay" and selected_run_id:
+            if not self.setup_replay_mode(selected_run_id):
+                print("❌ Erreur configuration replay, passage en mode nouvelle partie")
+                game_mode = "new_game"
+        
+        if game_mode == "new_game":
+            # Démarrer un nouveau run dans l'historique
+            run_id = self.history_manager.start_new_run()
+            self.current_run_started = True
+            print(f"🆕 Nouvelle partie - Run: {run_id}")
+            
+            # Logger le début de session
+            self.logger.log_session_start("new_game", run_id)
+        
+        print("\n🎮 MARIO FLUIDE avec CLAUDE LLM")
         print("Claude donne des macro-actions, Mario les exécute fluidement!")
+        print("=" * 60)
+        
+        mode_display = "🔄 REPLAY + IA" if self.replay_mode else "🤖 IA COMPLÈTE"
+        print(f"Mode: {mode_display}")
         print("=" * 60)
         
         obs = self.env.reset()
@@ -1621,41 +2090,71 @@ Réponds en JSON compact:
         try:
             while step_count < max_steps:
                 if not paused:
-                    # Obtenir l'action courante
-                    current_action = self.get_current_action()
+                    # PRIORITÉ 1: Mode replay
+                    if self.replay_mode:
+                        current_action = self.get_replay_action(step_count)
+                        
+                        # Si le replay est terminé, passer en mode IA
+                        if current_action is None:
+                            print("🔄➡️🤖 Transition: Replay terminé, IA prend la main!")
+                            # La logique IA normale prendra le relais
+                        
+                        # Enregistrer l'action rejouée dans le nouvel historique
+                        if current_action is not None and self.replay_index > 0:
+                            # Obtenir l'action précédente pour l'enregistrer
+                            prev_action_data = self.replay_actions[self.replay_index - 1]
+                            situation = self.analyze_situation(obs, {
+                                'x_pos': prev_action_data['position_x'],
+                                'y_pos': 200,
+                                'score': total_reward
+                            }, step_count)
+                            
+                            # Enregistrer dans le nouvel historique
+                            self.record_action(
+                                prev_action_data['action_name'], 
+                                situation, 
+                                step_count, 
+                                f"REPLAY: {prev_action_data['reasoning']}"
+                            )
                     
-                    if current_action is None:
-                        # Pas de macro en cours, besoin de Claude
-                        situation = self.analyze_situation(obs, {
-                            'x_pos': 40 + step_count * 2,
-                            'y_pos': 200,
-                            'score': total_reward
-                        }, step_count)
+                    # PRIORITÉ 2: Mode IA (quand replay désactivé ou pas de current_action)
+                    if not self.replay_mode or current_action is None:
+                        # Obtenir l'action courante de l'IA
+                        current_action = self.get_current_action()
                         
-                        # Sauvegarder pour l'historique d'apprentissage
-                        self.last_situation = situation
-                        self.current_step = step_count
-                        
-                        # Démarrer Claude en arrière-plan si pas déjà en cours
-                        # et si on a peu d'actions en réserve
-                        if not self.claude_thinking and len(self.action_queue) < 2:
-                            print(f"Déclenchement Claude - thinking:{self.claude_thinking}, queue:{len(self.action_queue)}, step:{step_count}")
-                            self.call_claude_async(situation, obs, step_count)
-                        
-                        # Action d'urgence si on n'a rien - ATTENTE SÉCURISÉE
-                        if len(self.action_queue) == 0:
-                            if not self.claude_thinking:
-                                # Claude n'est pas en train de réfléchir, on peut lui demander une action d'urgence
-                                emergency_action = self.get_fallback_macro()
-                                self.execute_macro_action(emergency_action)
-                                current_action = self.get_current_action()
-                                print("🚨 Attente sécurisée - Claude réfléchit...")
+                        if current_action is None:
+                            # Pas de macro en cours, besoin de Claude
+                            situation = self.analyze_situation(obs, {
+                                'x_pos': 40 + step_count * 2,
+                                'y_pos': 200,
+                                'score': total_reward
+                            }, step_count)
+                            
+                            # Sauvegarder pour l'historique d'apprentissage
+                            self.last_situation = situation
+                            self.current_step = step_count
+                            
+                            # Démarrer Claude en arrière-plan si pas déjà en cours
+                            # et si on a peu d'actions en réserve
+                            if not self.claude_thinking and len(self.action_queue) < 2:
+                                trigger_reason = "Post-replay" if hasattr(self, 'replay_mode') and not self.replay_mode else "Normal"
+                                print(f"Déclenchement Claude ({trigger_reason}) - thinking:{self.claude_thinking}, queue:{len(self.action_queue)}, step:{step_count}")
+                                self.call_claude_async(situation, obs, step_count)
+                            
+                            # Action d'urgence si on n'a rien - ATTENTE SÉCURISÉE
+                            if len(self.action_queue) == 0:
+                                if not self.claude_thinking:
+                                    # Claude n'est pas en train de réfléchir, on peut lui demander une action d'urgence
+                                    emergency_action = self.get_fallback_macro()
+                                    self.execute_macro_action(emergency_action)
+                                    current_action = self.get_current_action()
+                                    print("🚨 Attente sécurisée - Claude réfléchit...")
+                                else:
+                                    # Claude réfléchit, on attend en sécurité
+                                    current_action = 0  # NOOP - Mario reste immobile
                             else:
-                                # Claude réfléchit, on attend en sécurité
-                                current_action = 0  # NOOP - Mario reste immobile
-                        else:
-                            # Utiliser l'action en queue
-                            current_action = self.get_current_action()
+                                # Utiliser l'action en queue
+                                current_action = self.get_current_action()
                     
                     # Exécuter l'action dans le jeu
                     if current_action is not None:
@@ -1695,6 +2194,21 @@ Réponds en JSON compact:
                         if flag_get:
                             print("🎉 VICTOIRE! Mario a terminé le niveau!")
                             last_mario_decision = {'reasoning': 'VICTOIRE! Niveau terminé!', 'strategy': 'Mission accomplie'}
+                            
+                            # Logger la victoire
+                            self.logger.log_game_event("VICTORY", step_count, {
+                                "final_score": total_reward,
+                                "steps_taken": step_count,
+                                "api_calls": self.api_calls,
+                                "total_cost": self.total_cost
+                            })
+                            
+                            # Terminer le run avec victoire
+                            if self.current_run_started:
+                                summary = self.history_manager.end_run("victory", total_reward)
+                                if summary:
+                                    self.history_manager.print_run_summary(summary)
+                            
                             time.sleep(3)  # Pause pour admirer la victoire
                             break
                         else:
@@ -1708,6 +2222,21 @@ Réponds en JSON compact:
                             # Vérifier si c'est vraiment game over (3 morts)
                             if self.deaths_count >= 3:
                                 print("💀 GAME OVER - Mario a utilisé ses 3 vies!")
+                                
+                                # Logger le game over
+                                self.logger.log_game_event("GAME_OVER", step_count, {
+                                    "deaths": self.deaths_count,
+                                    "final_score": total_reward,
+                                    "steps_taken": step_count,
+                                    "final_position": mario_x_death
+                                })
+                                
+                                # Terminer le run avec mort
+                                if self.current_run_started:
+                                    summary = self.history_manager.end_run("death", total_reward)
+                                    if summary:
+                                        self.history_manager.print_run_summary(summary)
+                                
                                 break
                             else:
                                 print("🔄 Redémarrage automatique...")
@@ -1736,10 +2265,48 @@ Réponds en JSON compact:
                     
         except KeyboardInterrupt:
             print("\n⏹️ Arrêt demandé")
+            
+            # Logger l'interruption
+            self.logger.log_game_event("INTERRUPTED", step_count, {
+                "reason": "user_keyboard_interrupt",
+                "final_score": total_reward,
+                "steps_taken": step_count
+            })
+            
+            # Terminer le run avec interruption
+            if self.current_run_started:
+                summary = self.history_manager.end_run("interrupted", total_reward)
+                if summary:
+                    self.history_manager.print_run_summary(summary)
         
         finally:
+            # Logger la fin de session avec statistiques
+            final_stats = {
+                "steps_total": step_count,
+                "final_score": total_reward,
+                "deaths": self.deaths_count,
+                "lives_used": self.lives_used,
+                "api_calls": self.api_calls,
+                "successful_macros": self.successful_macros,
+                "total_cost": self.total_cost,
+                "final_position": real_info.get('x_pos', 0) if 'real_info' in locals() else 0
+            }
+            
+            self.logger.log_session_end(final_stats)
+            
             cv2.destroyAllWindows()
             self.env.close()
+            
+            # Fermer le logger
+            self.logger.close()
+            
+            # Afficher les fichiers de log créés
+            log_files = self.logger.get_session_files()
+            print(f"\n📝 Fichiers de log créés:")
+            for log_file in log_files:
+                if os.path.exists(log_file):
+                    size_kb = os.path.getsize(log_file) / 1024
+                    print(f"   📄 {os.path.basename(log_file)} ({size_kb:.1f} KB)")
         
         # Statistiques finales
         print(f"\n🏆 RÉSULTATS MARIO FLUIDE:")
@@ -1756,6 +2323,25 @@ Réponds en JSON compact:
         if self.deaths_count > 0:
             survival_rate = (step_count - self.deaths_count * 20) / step_count * 100  # Approximation
             print(f"   📈 Taux de survie: {survival_rate:.1f}%")
+        
+        # Afficher les statistiques d'historique
+        print(f"\n📊 HISTORIQUE GLOBAL:")
+        updated_stats = self.history_manager.get_run_stats()
+        print(f"   🏃 Runs totaux: {updated_stats.get('total_runs', 0)}")
+        if updated_stats.get('total_runs', 0) > 0:
+            print(f"   🏆 Record distance: {updated_stats['best_distance']} pixels")
+            print(f"   🚀 Record vitesse: {updated_stats['best_speed']:.2f} px/s")
+            completion = updated_stats.get('completion_rates', {})
+            print(f"   🎯 Victoires: {completion.get('victory', 0)} | Morts: {completion.get('death', 0)} | Interruptions: {completion.get('interrupted', 0)}")
+            
+            # Comparer avec le meilleur run
+            best_run = self.history_manager.get_best_run()
+            if best_run:
+                current_distance = real_info.get('x_pos', 0) if 'real_info' in locals() else 0
+                if current_distance > best_run.max_position_x:
+                    print(f"   🎉 NOUVEAU RECORD! Ancien: {best_run.max_position_x} → Nouveau: {current_distance}")
+                else:
+                    print(f"   📊 Performance: {current_distance}/{best_run.max_position_x} pixels du record")
 
 def main():
     print("🚀 Mario Bros FLUIDE - Claude LLM avec Macro-Actions")

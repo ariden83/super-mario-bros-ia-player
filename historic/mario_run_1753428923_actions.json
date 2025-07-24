@@ -1,0 +1,10 @@
+[
+  {
+    "timestamp": 3.1051199436187744,
+    "step_count": 70,
+    "position_x": 180,
+    "position_y": 200,
+    "action_name": "wait",
+    "reasoning": "Attente sécurisée en attendant les instructions Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 
