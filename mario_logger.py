@@ -121,7 +121,7 @@ class MarioLogger:
             'source': source  # AI, REPLAY, EMERGENCY
         }
         
-        self.action_logger.info(f"ACTION - Step {step_count:4d} | {source:7s} | {action_name:20s} | Pos({position_x:4d},{position_y:3d}) | Score:{score:6d} | {reasoning}")
+        self.action_logger.info(f"ACTION - Step {int(step_count):4d} | {source:7s} | {action_name:20s} | Pos({int(position_x):4d},{int(position_y):3d}) | Score:{int(score):6d} | {reasoning}")
         self.main_logger.info(f"Mario action: {action_name} at step {step_count}")
     
     def log_claude_prompt(self, prompt_type: str, prompt: str, step_count: int):

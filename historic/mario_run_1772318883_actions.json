@@ -1,0 +1,632 @@
+[
+  {
+    "timestamp": 2.0001232624053955,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 2.5085251331329346,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 3.587651491165161,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 4.111672878265381,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 5.208426475524902,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 5.739452838897705,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 5.740127325057983,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 6.252295970916748,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 7.574021577835083,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 8.10363221168518,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 9.204572677612305,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 9.71565866470337,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 10.79457950592041,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 11.323756694793701,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 12.399858713150024,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 13.490046739578247,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 14.015814065933228,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 14.542080640792847,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 15.856610536575317,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 16.943523645401,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 17.468276977539062,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 18.78685736656189,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 22.28380560874939,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "[step_back→run] Avancer plutôt que reculer",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 22.469651460647583,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 23.008053064346313,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "high_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 23.355647802352905,
+    "step_count": 41,
+    "position_x": 122,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.13333333333333333,
+    "score": 29.0
+  },
+  {
+    "timestamp": 24.752807140350342,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 25.2817165851593,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "approach_and_hit_block",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 26.587644815444946,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 26.588677883148193,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 27.10384726524353,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "[step_back→run] Avancer plutôt que reculer",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 28.197973489761353,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 31.70805311203003,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 35.207730531692505,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 35.20875430107117,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 86px (larg=31px) → saut max",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 36.95612931251526,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 36.957637786865234,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 16px (larg=17px) → saut max",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 38.360663175582886,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 39.460773229599,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 42.9405574798584,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 43.45959949493408,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 44.54848647117615,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 46.960487365722656,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 47.47981309890747,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=40",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 48.58262300491333,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=40",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 49.23713397979736,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 49.764493227005005,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=101",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 50.87157726287842,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=101",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 51.97194147109985,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=201",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 52.76509165763855,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 53.29230546951294,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=301",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 54.387925148010254,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=301",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 55.479926109313965,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=401",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 56.26490759849548,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 56.79267716407776,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Replay optimal segment x=401",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 56.87823438644409,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Solution mémorisée x=436 (2x confirmée)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 57.980658769607544,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Solution mémorisée x=436 (2x confirmée)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 59.09595799446106,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "stomp_enemy",
+    "reasoning": "Solution mémorisée x=436 (2x confirmée)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 59.62397122383118,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Solution mémorisée x=436 (2x confirmée)",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 60.732057094573975,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 61.788275480270386,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 63.50375533103943,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  },
+  {
+    "timestamp": 64.59224510192871,
+    "step_count": 562,
+    "position_x": 1164,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 10.6,
+    "score": 788.0
+  }
+]

@@ -14,6 +14,7 @@ __pycache__/
 # Virtual environment
 mario_env/
 venv/
+.venv/
 env/
 
 # IDE files
