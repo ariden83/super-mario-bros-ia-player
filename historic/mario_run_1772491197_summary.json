@@ -1,0 +1,12 @@
+{
+  "run_id": "mario_run_1772491197",
+  "start_time": "2026-03-02 23:39:57",
+  "duration": 87.64419674873352,
+  "max_position_x": 2226,
+  "final_score": 1403.0,
+  "total_steps": 1093,
+  "deaths_count": 0,
+  "actions_count": 35,
+  "completion_status": "death",
+  "average_speed": 24.94175405893703
+}

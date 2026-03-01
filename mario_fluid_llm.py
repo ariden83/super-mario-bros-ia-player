@@ -55,7 +55,7 @@ class MarioFluidLLM:
             'precise_jump': {'base_action': 2, 'duration': 10, 'description': 'Saut précis sur ennemis/blocs'},
             
             # Actions spéciales Mario Bros
-            'stomp_enemy': {'base_action': 2, 'duration': 12, 'description': 'Sauter sur Goomba/Koopa pour les tuer (right+A, 12 frames = saut contrôlé vers la droite, portée ~30-40px)'},
+            'stomp_enemy': {'base_action': 2, 'duration': 20, 'description': 'Sauter sur Goomba/Koopa pour les tuer (right+A, 20 frames = saut fiable vers la droite, portée ~40-55px, hauteur suffisante pour passer au-dessus)'},
             'hit_block': {'base_action': 5, 'duration': 20, 'description': 'Frapper bloc ? par dessous pour items (saut vertical long)'},
             'position_under_block': {'base_action': 1, 'duration': 15, 'description': 'Se positionner sous un bloc question mark (mouvement long)'},
             'approach_and_hit_block': {'base_action': 4, 'duration': 30, 'description': 'Approcher et frapper bloc en un mouvement (RUN_JUMP)'},
@@ -124,6 +124,7 @@ class MarioFluidLLM:
         
         # Système de screenshots
         self.last_screenshot_step = 0
+        self.last_screenshot_x = 0  # coord monde NES au moment du dernier screenshot
         self.screenshot_frequency = 15  # Prendre un screenshot toutes les 15 steps (meilleure anticipation)
         self.use_visual_analysis = True  # Utiliser l'analyse d'image Claude
         self.screenshot_cost_limit = 1.00  # Limite de coût pour les screenshots ($1.00) - augmentée pour meilleure anticipation
@@ -195,8 +196,20 @@ class MarioFluidLLM:
         self._phase3_last_x_step: int = 0  # Step de la dernière progression détectée
 
         # Couche réflexe pixel
-        self.last_reflex_step = -80      # Cooldown réflexe ennemi
+        self.last_reflex_step = -25      # Cooldown réflexe ennemi (25 frames)
         self.last_hole_reflex_step = -60 # Cooldown réflexe trou (séparé)
+
+        # Système de rewind sur mort
+        self.rewind_buffer = deque(maxlen=3)  # 3 checkpoints (60 frames d'écart)
+        self.rewind_count = 0                  # Rewinds utilisés cette partie
+        self.max_rewinds = float('inf')        # Rewinds illimités
+        self._rewind_active = False            # Pour overlay visuel
+        self._rewind_correction_msg = None     # Message injecté dans le prochain prompt Claude
+        self._raw_action_history = []          # Historique brut des actions NES (pour replay PPU)
+        self._claude_generation = 0            # Incrémenté à chaque rewind pour invalider threads en cours
+        self._death_positions = []             # Historique des positions de mort pour le message rewind
+        self._danger_zone_x = None             # Position X à éviter après rewind (filet de sécurité)
+        self._rewind_real_info = None          # real_info capturé après replay PPU (évite info périmée)
 
         # Système anti-blocage
         self.stuck_counter = 0           # Nombre de checks consécutifs sans progression
@@ -221,11 +234,12 @@ class MarioFluidLLM:
         self.previous_enemies = []  # Positions des ennemis à la frame précédente
         self.enemy_movement_history = deque(maxlen=3)  # Historique sur 3 frames
 
-        # Charger les overrides de config (paramètres ajustés automatiquement par l'auto-improver)
-        self._load_config_override()
-
-        # Ajouts aux prompts générés par l'auto-improver
+        # Ajouts aux prompts (valeur par défaut, écrasée par _load_config_override si config existe)
         self._prompt_additions: dict = {"stuck_mode": [], "main_context": []}
+
+        # Charger les overrides de config (paramètres ajustés automatiquement par l'auto-improver)
+        # NB: doit venir APRÈS l'initialisation de _prompt_additions
+        self._load_config_override()
 
         print("✅ Mario Fluide LLM initialisé!")
 
@@ -855,9 +869,9 @@ class MarioFluidLLM:
         """Capturer et optimiser l'écran de jeu pour Claude (coûts réduits)"""
         try:
             print(f"Début capture screenshot - obs shape: {obs.shape if obs is not None else 'None'}")
-            # Convertir de BGR (OpenCV) vers RGB
-            rgb_image = cv2.cvtColor(obs, cv2.COLOR_BGR2RGB)
-            
+            # obs est déjà en RGB (standard OpenAI Gym) — pas de conversion nécessaire
+            rgb_image = obs.copy()
+
             # Convertir en PIL Image
             pil_image = Image.fromarray(rgb_image)
             
@@ -879,10 +893,25 @@ class MarioFluidLLM:
             except AttributeError:
                 # Fallback pour les versions anciennes de Pillow
                 resized_image = game_area_crop.resize(optimized_size, Image.LANCZOS)
-            
+
+            # Calculer le masque mystery sur l'image ORIGINALE (pixels NES purs, avant crop/resize)
+            # Le resize LANCZOS mélange les pixels → couleurs NES diluées → détection instable
+            orig_crop_top = int(height * 0.15)
+            rgb_cropped_orig = rgb_image[orig_crop_top:, :]  # même crop, résolution originale
+            mystery_mask_orig = self._compute_mystery_mask(rgb_cropped_orig)
+            # Scaler avec NEAREST pour garder des bords nets sans mélange de pixels
+            self._precomputed_mystery_mask = cv2.resize(
+                mystery_mask_orig.astype(np.uint8),
+                optimized_size,  # (W, H) convention cv2
+                interpolation=cv2.INTER_NEAREST
+            ).astype(bool)
+
             # OPTIMISATION 3: Appliquer des filtres pour améliorer la détection
             enhanced_image = self.apply_detection_filters(resized_image)
-            
+
+            # ANNOTATION: Boîtes colorées Mario (VERT) + ennemis (ROUGE) pour le LLM
+            enhanced_image = self._annotate_entities_for_llm(enhanced_image, obs)
+
             # OPTIMISATION 4: Format et qualité améliorée pour meilleure vision
             img_buffer = io.BytesIO()
             if self.ultra_low_cost_mode:
@@ -930,35 +959,130 @@ class MarioFluidLLM:
             print(f"❌ Erreur capture screenshot: {e}")
             return None
     
+    def _compute_mystery_mask(self, raw_array):
+        """Détecter les mystery blocks par correspondance EXACTE de couleur NES.
+        RGB(68, 160, 252) est une entrée fixe de la palette hardware NES :
+        elle est identique à chaque frame, indépendante de l'animation du sprite."""
+        # Correspondance pixel-exact : même NES palette entry → même RGB, toujours
+        mystery_color = np.array([68, 160, 252], dtype=np.uint8)
+        mask = np.all(raw_array == mystery_color, axis=2)
+        if np.any(mask):
+            print(f"🟣 Mystery blocks détectés ({np.sum(mask)} pixels)")
+        return mask
+
     def apply_detection_filters(self, image):
-        """Appliquer des filtres pour améliorer la détection de Claude"""
+        """Appliquer des filtres pour améliorer la détection de Claude.
+        NOTE: le CLAHE a été supprimé — il écrasait les couleurs vives NES (orange-rouge 248,56,0
+        → sombre ~67,0,0) rendant sprites et sol indiscernables. Les couleurs NES natives
+        ont déjà un contraste naturel élevé (ciel bleu foncé vs sprites orange-rouge)."""
         try:
-            # Convertir en numpy pour OpenCV
             img_array = np.array(image)
-            
-            # FILTRE 1: Augmenter le contraste pour différencier les éléments
-            # Utiliser CLAHE (Contrast Limited Adaptive Histogram Equalization)
-            lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4,4))
-            lab[:,:,0] = clahe.apply(lab[:,:,0])
-            enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-            
-            # FILTRE 2: Légère netteté pour clarifier les contours
-            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-            sharpened = cv2.filter2D(enhanced, -1, kernel * 0.3)  # Facteur réduit pour éviter l'over-sharpening
-            
-            # FILTRE 3: Réduction du bruit tout en préservant les détails
-            denoised = cv2.bilateralFilter(sharpened, 5, 50, 50)
-            
-            # Reconvertir en PIL
-            filtered_image = Image.fromarray(denoised)
-            
-            return filtered_image
-            
+
+            # Masque mystery blocks calculé sur pixels NES originaux
+            mystery_mask = getattr(self, '_precomputed_mystery_mask', None)
+            if mystery_mask is None or mystery_mask.shape[:2] != img_array.shape[:2]:
+                mystery_mask = self._compute_mystery_mask(img_array)  # fallback
+
+            # Netteté standard : kernel [[-1,-1,-1],[-1,9,-1],[-1,-1,-1]] sans scale
+            # → zones uniformes préservées (9p-8p=p), bords rehaussés
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]], dtype=np.float32)
+            sharpened = cv2.filter2D(img_array.astype(np.float32), -1, kernel)
+            sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+
+            # Appliquer couleur dédiée MAGENTA sur les mystery blocks
+            if np.any(mystery_mask):
+                sharpened[mystery_mask] = [255, 0, 255]
+
+            return Image.fromarray(sharpened)
+
         except Exception as e:
             print(f"⚠️ Erreur filtres, image originale utilisée: {e}")
             return image
-    
+
+    def _annotate_entities_for_llm(self, screenshot_pil, obs):
+        """Peint les sprites ennemis en JAUNE VIF en lisant l'OAM NES directement.
+        L'OAM (Object Attribute Memory) contient les coordonnées ÉCRAN de chaque sprite.
+        Palette 0 = Mario, Palette 3 = ennemis → distinction fiable indépendante des couleurs.
+        """
+        try:
+            img = np.array(screenshot_pil)
+            img_h, img_w = img.shape[:2]
+            obs_h = obs.shape[0]  # 240
+
+            crop_top = int(obs_h * 0.15)       # 36px supprimés en haut (HUD)
+            scale_y  = img_h / (obs_h - crop_top)  # ≈ 0.941
+
+            # Lire le buffer OAM depuis la RAM NES (0x0200-0x027F, 64 sprites × 4 bytes)
+            # Format OAM: [Y_écran, tile_num, attributs, X_écran]
+            # Attribut bits 0-1 = index palette: 0=Mario, 1=HUD/objets, 2=?, 3=ennemis
+            try:
+                ram = self.env.unwrapped.ram
+            except AttributeError:
+                return screenshot_pil
+
+            OAM_BASE   = 0x0200
+            HUD_Y_MAX  = 32   # ignorer sprites HUD dans la barre du haut (y<32)
+            ENEMY_PAL  = 0x03 # palette 3 = ennemis NES (Goombas, Koopas, etc.)
+
+            # 1er passage : collecter tous les sprites ennemis
+            raw_sprites = []
+            for i in range(64):
+                y_nes = int(ram[OAM_BASE + i*4 + 0])
+                attr  = int(ram[OAM_BASE + i*4 + 2])
+                x_nes = int(ram[OAM_BASE + i*4 + 3])
+                if y_nes < HUD_Y_MAX or y_nes >= 240:
+                    continue
+                if (attr & 0x03) != ENEMY_PAL:
+                    continue
+                raw_sprites.append((x_nes, y_nes))
+
+            # 2e passage : grouper les sprites proches en une seule entité
+            # (un Goomba = 6 sprites OAM 8×8 en 2 col × 3 rangées)
+            entities = []  # liste de (x_min, x_max, y_min, y_max) en NES coords
+            for (sx, sy) in raw_sprites:
+                merged = False
+                for e in entities:
+                    # Fusionner si le sprite est à ≤16px x/y d'une entité existante
+                    if sx <= e[1] + 16 and sx + 8 >= e[0] - 16 and sy <= e[3] + 16 and sy + 8 >= e[2] - 16:
+                        e[0] = min(e[0], sx)
+                        e[1] = max(e[1], sx + 8)
+                        e[2] = min(e[2], sy)
+                        e[3] = max(e[3], sy + 8)
+                        merged = True
+                        break
+                if not merged:
+                    entities.append([sx, sx + 8, sy, sy + 8])
+
+            # 3e passage : peindre la bounding box de chaque entité en JAUNE VIF
+            n_painted = 0
+            for (x1_nes, x2_nes, y1_nes, y2_nes) in entities:
+                # Si l'entité dépasse 16px de haut (3 rangées OAM), sauter la rangée
+                # du haut (souvent une tuile auxiliaire vide, tile=0xFC) pour garder
+                # une taille correcte de ~16px (2 rangées = sprite standard Goomba)
+                h_nes = y2_nes - y1_nes
+                y1_draw = y1_nes + 8 if h_nes > 16 else y1_nes
+                sy1 = int((y1_draw - crop_top) * scale_y)
+                sy2 = int((y2_nes  - crop_top) * scale_y)
+                if sy2 < 0 or sy1 >= img_h:
+                    continue
+                y1 = max(0, sy1)
+                y2 = min(img_h, sy2)
+                x1 = max(0, x1_nes)
+                x2 = min(img_w, x2_nes)
+                img[y1:y2, x1:x2] = [255, 255, 0]
+                n_painted += 1
+
+            if n_painted > 0:
+                print(f"🎨 OAM: {n_painted} ennemi(s) peints en jaune ({len(raw_sprites)} sprites groupés)")
+            else:
+                print(f"🔍 OAM: aucun sprite ennemi (palette 3) visible à l'écran")
+
+            return Image.fromarray(img)
+
+        except Exception as e:
+            print(f"⚠️ OAM annotation erreur: {e}")
+            return screenshot_pil
+
     def analyze_screenshot_with_claude(self, screenshot_b64, situation, step_count):
         """Envoyer le screenshot à Claude pour analyse visuelle"""
         
@@ -973,21 +1097,26 @@ class MarioFluidLLM:
             mario_x, mario_y = mario['x'], mario['y']
             screen_width = 256  # Largeur écran NES
             
-            prompt = f"""Tu es Claude, expert Mario Bros ! Analyse cette capture d'écran du jeu en temps réel.
+            # Bloc correction rewind : injecté en tête si Mario vient d'être rembobiné
+            _rewind_block = ""
+            if self._rewind_correction_msg:
+                _rewind_block = self._rewind_correction_msg + "\n\n"
+                self._rewind_correction_msg = None  # Consommé, ne pas répéter
+
+            prompt = _rewind_block + f"""Tu es Claude, expert Mario Bros ! Analyse cette capture d'écran du jeu en temps réel.
 
 CONTEXTE DÉTAILLÉ MARIO:
-🔹 Position actuelle: X={mario_x}, Y={mario_y} (sur écran {screen_width}px de large)
+🔹 Position monde: X={mario_x}px (coord NES absolue depuis début niveau), Y={mario_y}px
+🔹 Ecran NES: {screen_width}x240px — Mario apparaît visuellement vers le tiers gauche de l'écran (~80px) quand la caméra scroll
 🔹 Vitesse: {mario_speed:.1f} pixels/step ({'vers droite' if mario_speed > 0 else 'stationnaire' if mario_speed == 0 else 'vers gauche'})
 🔹 Score: {mario['score']} | Step: {step_count}
 🔹 Progression: {progress['status']} (tendance: {progress['trend']}px sur 30 steps)
-🔹 Zone d'écran: Mario occupe ~{(mario_x/screen_width)*100:.0f}% de la largeur écran
 🔹 Morts: {self.deaths_count} | Vies utilisées: {self.lives_used}
 
-📐 ÉCHELLE SCREENSHOT → JEU (TRÈS IMPORTANT):
+📐 ÉCHELLE SCREENSHOT → JEU:
 🔹 Dimensions screenshot: {self.screenshot_dimensions[0]}x{self.screenshot_dimensions[1]}px
-🔹 Dimensions jeu réelles: {self.original_game_dimensions[0]}x{self.original_game_dimensions[1]}px  
-🔹 FACTEUR CONVERSION: 1px sur screenshot = {self.current_scale_factor:.2f}px dans le jeu
-🔹 Pour donner des distances précises, multiplie tes mesures par {self.current_scale_factor:.2f}
+🔹 LARGEUR: 1:1 exact — 1px horizontal sur screenshot = 1px NES. Mario apparaît ~{self.screenshot_dimensions[0]//3}px depuis la gauche.
+🔹 Pour "px" dans run_forward: mesure directement en pixels horizontaux sur le screenshot, PAS de facteur à appliquer.
 
 📚 HISTORIQUE D'APPRENTISSAGE - APPRENDS DE TES ERREURS:
 {self.get_learning_context()}
@@ -1008,7 +1137,7 @@ Regarde attentivement cette image et identifie EN PRIORITÉ ABSOLUE:
 
 1. ENNEMIS ET DANGERS MORTELS: 
    - QUELS ennemis vois-tu (Goombas bruns, Koopas verts)?
-   - DISTANCE CRITIQUE: À quelle distance EXACTE de Mario (mesure sur screenshot puis × {self.current_scale_factor:.1f} = distance jeu réelle. Seuils: <{15/self.current_scale_factor:.0f}px screenshot = DANGER IMMÉDIAT, {15/self.current_scale_factor:.0f}-{30/self.current_scale_factor:.0f}px = ATTENTION, >{30/self.current_scale_factor:.0f}px = SÛR)?
+   - DISTANCE CRITIQUE: À quelle distance EXACTE de Mario en pixels horizontaux du screenshot (largeur 1:1 NES). Seuils: <15px = DANGER IMMÉDIAT, 15-30px = ATTENTION, >30px = SÛR)?
    - DIRECTION ET VITESSE: L'ennemi se déplace-t-il VERS Mario (DANGER) ou s'éloigne-t-il (SÛR)?
    - CALCUL COLLISION: Combien de steps avant collision si Mario continue à droite?
    - ÉCHAPPATOIRES: Y a-t-il des plateformes/tuyaux pour fuir?
@@ -1054,14 +1183,23 @@ ACTIONS MARIO DISPONIBLES:
 - TUYAU (entrée zone bonus): 'pipe_down'
 - PLATEFORME + ENNEMI: 'wait_for_enemy' puis 'pipe_jump' quand ennemi passé
 
-Donne 4-6 actions tactiques. Réponds en JSON compact:
-{{"actions":[{{"macro_action":"<nom>"}}],"strategy":"<court>","urgency":<1-10>,"next_target":"<prochain objectif>"}}"""
+📐 DISTANCES OBLIGATOIRES — format JSON:
+- run_forward DOIT avoir "px" = pixels à parcourir (≈2px/frame). MAX 60px par action (ex: zone libre → 3x run_forward px=60).
+  Exemples: ennemi à 80px → px=55 (s'arrêter à 25px, réflexe gère le stomp)
+            tuyau à 120px → px=90 (s'arrêter devant), puis pipe_jump
+- max_jump PEUT avoir "px" = pixels d'approche AVANT le saut (ex: px=30 → avance 30px puis saute max).
+  Sans px : saute depuis position actuelle.
+- Autres sauts (pipe_jump, stomp_enemy, obstacle_jump, run_jump_over) : PAS de px (durée fixe)
+
+Donne 3-5 actions. ⚠️ RÉPONDS EN JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION, ZÉRO COMMENTAIRE:
+{{"actions":[{{"macro_action":"run_forward","px":60}},{{"macro_action":"pipe_jump"}}],"urgency":<1-10>}}"""
 
             self.api_calls += 1
             print(f"📸 Envoi screenshot à Claude (appel #{self.api_calls})...")
             
-            # Logger le prompt
-            self.logger.log_claude_prompt("SCREENSHOT", prompt, step_count)
+            # Logger le prompt avec le screenshot associé
+            self.logger.log_claude_prompt("SCREENSHOT", prompt, step_count,
+                                          screenshot_b64=screenshot_b64)
             
             print("="*80)
             print("🔍 PROMPT ENVOYÉ À CLAUDE:")
@@ -1072,8 +1210,9 @@ Donne 4-6 actions tactiques. Réponds en JSON compact:
                 model="claude-3-haiku-20240307",
                 max_tokens=400,  # Augmenté pour permettre des réponses JSON complètes avec plusieurs actions
                 temperature=0.1,
+                system="Tu es un contrôleur de jeu Mario. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après. Aucune explication, aucun commentaire.",
                 messages=[{
-                    "role": "user", 
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
                         {"type": "image", "source": {
@@ -1180,7 +1319,13 @@ Donne 4-6 actions tactiques. Réponds en JSON compact:
         else:
             hole_section = ""
 
-        prompt = f"""🍄 Tu es Claude, EXPERT MARIO BROS NES ! Mario a besoin de 2-3 actions RAPIDES car le jeu est dangereux !
+        # Bloc correction rewind (chemin texte-seul, même logique que screenshot)
+        _rewind_block = ""
+        if self._rewind_correction_msg:
+            _rewind_block = self._rewind_correction_msg + "\n\n"
+            self._rewind_correction_msg = None  # Consommé
+
+        prompt = _rewind_block + f"""🍄 Tu es Claude, EXPERT MARIO BROS NES ! Mario a besoin de 2-3 actions RAPIDES car le jeu est dangereux !
 
 📍 SITUATION MARIO:
 • Position: X={mario['x']}, Y={mario['y']} | Score: {mario['score']} | Step: {situation['step']}
@@ -1221,19 +1366,22 @@ Donne 4-6 actions tactiques. Réponds en JSON compact:
 5. ⚡ EN CAS DE DOUTE → run_forward pour approcher, puis stomp_enemy quand < 50px
 6. 🎯 Priorité absolue: SURVIE > Collecte de blocs/items
 7. ⛰️ TROU DÉTECTÉ → max_jump IMMÉDIATEMENT, jamais run_forward vers un trou!
-8. 🎮 Séquence correcte: run_forward (approcher) → stomp_enemy (< 50px) → run_forward (continuer)
+8. 🎮 Séquence correcte: run_forward (approcher) → stomp_enemy (< 50px) → stomp_enemy si autre ennemi, sinon run_forward SEULEMENT si zone dégagée
+9. ⚠️ APRÈS stomp_enemy : NE PAS mettre run_forward si ennemi encore visible ! Mario atterrit et court dedans.
 
-🎯 DONNE 5-6 ACTIONS ADAPTÉES À LA SITUATION!
+🎯 DONNE 2-3 ACTIONS ADAPTÉES À LA SITUATION!
 
-JSON compact seulement:
-{{"actions":[{{"macro_action":"<nom>"}},{{"macro_action":"<nom>"}}],"strategy":"<court>","urgency":<1-10>}}
+📐 run_forward "px" ≤ 60 (≈2px/frame). max_jump accepte "px" = approche avant saut.
+⚠️ JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION:
+{{"actions":[{{"macro_action":"run_forward","px":60}},{{"macro_action":"<saut_ou_action>"}}],"urgency":<1-10>}}
 
-Exemples PRIORITÉ SURVIE:
-Ennemi proche (<50px): {{"actions":[{{"macro_action":"stomp_enemy"}},{{"macro_action":"run_forward"}}],"strategy":"SURVIE - STOMP","urgency":10}}
-Ennemi lointain (50-100px): {{"actions":[{{"macro_action":"run_forward"}},{{"macro_action":"run_forward"}}],"strategy":"APPROCHE PRUDENTE","urgency":6}}
-Ennemi qui s'éloigne: {{"actions":[{{"macro_action":"run_forward"}},{{"macro_action":"approach_and_hit_block"}}],"strategy":"Progression sécurisée","urgency":5}}
-Zone sûre + bloc: {{"actions":[{{"macro_action":"approach_and_hit_block"}},{{"macro_action":"collect_powerup"}}],"strategy":"Collecte systématique","urgency":7}}
-Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_action":"run_forward"}}],"strategy":"Fuite tactique","urgency":9}}"""
+Exemples avec distances réelles:
+Ennemi à 30px: {{"actions":[{{"macro_action":"stomp_enemy"}}],"urgency":10}}
+Ennemi à 80px: {{"actions":[{{"macro_action":"run_forward","px":55}},{{"macro_action":"stomp_enemy"}}],"urgency":8}}
+Tuyau à 100px: {{"actions":[{{"macro_action":"run_forward","px":70}},{{"macro_action":"pipe_jump"}}],"urgency":6}}
+Zone libre 200px: {{"actions":[{{"macro_action":"run_forward","px":200}}],"urgency":4}}
+Trou immédiat: {{"actions":[{{"macro_action":"max_jump"}}],"urgency":10}}
+Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgency":5}}"""
 
         return prompt
     
@@ -1268,6 +1416,7 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
                 model="claude-3-haiku-20240307",
                 max_tokens=200,  # Suffisant pour 4-6 actions JSON sans reasoning
                 temperature=0.1,  # Plus déterministe
+                system="Tu es un contrôleur de jeu Mario. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après. Aucune explication, aucun commentaire.",
                 messages=[{"role": "user", "content": prompt}]
             )
             
@@ -1296,8 +1445,8 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
     
     def call_claude_async(self, situation, obs=None, step_count=0):
         """Appeler Claude en arrière-plan avec système hybride optimisé"""
-        
-        def claude_worker():
+
+        def claude_worker(generation=self._claude_generation):
             try:
                 # 🧠 DÉCISION HYBRIDE: Screenshot complet vs Mise à jour positionnelle
                 use_screenshot, reason = self.should_use_screenshot_vs_positions(step_count)
@@ -1311,6 +1460,8 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
                         if screenshot:
                             claude_response = self.analyze_screenshot_with_claude(screenshot, situation, step_count)
                             self.last_screenshot_step = step_count
+                            self.last_screenshot_x = situation.get('mario', {}).get('x', self.last_screenshot_x)
+                            self.last_positions_update = step_count  # sync pour cooldown trigger
                             # Marquer le contexte comme établi après le premier screenshot
                             if not self.level_context_established:
                                 self.level_context_established = True
@@ -1353,8 +1504,17 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
                 actions = self.parse_claude_actions(claude_response)
                 
                 # Ajouter les actions à la queue
-                # Filtrage : 'wait' → 'run_forward' (attendre = cible facile pour les ennemis)
-                #            'step_back' → 'run_forward' sauf si Mario est bloqué (vitesse < 0)
+                # Vérifier que le rewind n'a pas eu lieu pendant l'appel API.
+                # Si la génération a changé, les actions sont périmées → les ignorer.
+                if generation != self._claude_generation:
+                    print(f"⚠️ Thread Claude périmé (gen {generation} → {self._claude_generation}), actions ignorées")
+                    return
+
+                # Règles de filtrage :
+                #   'wait'        → 'run_forward'
+                #   'step_back'   → 'run_forward' si Mario avance
+                #   'stomp_enemy' → 'run_forward' : le réflexe pixel gère le stomp automatiquement
+                #                   au bon moment (<55px). Claude ne doit PAS planifier les stomps.
                 _mario_speed = (self.last_situation or {}).get('mario', {}).get('speed', 1)
                 for action in actions:
                     if len(self.action_queue) < 5:  # Éviter l'overflow (max 4 actions planifiées)
@@ -1367,6 +1527,13 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
                             action = dict(action,
                                           macro_name='run_forward',
                                           reasoning='[step_back→run] Avancer plutôt que reculer')
+                        elif mname == 'stomp_enemy':
+                            # stomp_enemy → run_jump_over : saut par-dessus l'ennemi.
+                            # run_jump_over (right+A+B, 35f, ~140px) est plus fiable que
+                            # stomp_enemy (right+A, 20f, ~55px) car couvre plus de distance.
+                            action = dict(action,
+                                          macro_name='run_jump_over',
+                                          reasoning='[stomp→jump] Saut par-dessus l\'ennemi')
                         self.action_queue.append(action)
                 
                 print(f"✅ Claude ({analysis_type}) a fourni {len(actions)} actions")
@@ -1424,19 +1591,26 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
                     if isinstance(action_data, dict):
                         macro_name = action_data.get('macro_action', 'walk_right')
                         reasoning = action_data.get('reasoning', 'Action Claude')
-                        
+                        px = action_data.get('px')  # distance en pixels (optionnel)
+
                         # Valider la macro-action
                         if macro_name not in self.macro_actions:
                             print(f"⚠️ Macro inconnue '{macro_name}', utilisation de walk_right")
                             macro_name = 'walk_right'
-                        
-                        actions_list.append({
+
+                        action_dict = {
                             'macro_name': macro_name,
                             'reasoning': reasoning,
                             'strategy': strategy,
                             'urgency': urgency,
                             'confidence': 80
-                        })
+                        }
+                        if px is not None:
+                            try:
+                                action_dict['px'] = int(px)
+                            except (ValueError, TypeError):
+                                pass
+                        actions_list.append(action_dict)
                 
                 if actions_list:
                     visual_analysis = data.get('visual_analysis', '')
@@ -1580,48 +1754,55 @@ Fuite nécessaire: {{"actions":[{{"macro_action":"run_jump_over"}},{{"macro_acti
             return 3  # RUN
 
     def check_immediate_threat(self, obs):
-        """⚡ COUCHE RÉFLEXE v3 : détection fiable grâce aux couleurs rectangles unies.
-        En mode v3, Mario et les Goombas ont la même couleur RGB(248,56,0).
-        Mario est toujours à gauche (~x=80), les Goombas arrivent par la droite.
-        On cherche des rectangles orange-rouge à droite du centre de Mario.
+        """⚡ COUCHE RÉFLEXE OAM : détection ennemis via RAM NES (OAM sprites).
+        Les Goombas sont RGB(228,92,16) ≠ Mario RGB(248,56,0) → la détection couleur
+        ne fonctionnait pas. L'OAM donne les positions écran exactes avec palette=3 (ennemis).
         """
         try:
-            height, width = obs.shape[:2]
-            # Ignorer le HUD (20% haut) et regarder la zone au sol (60-95% hauteur)
-            ground_area = obs[int(height * 0.60):int(height * 0.95), :]
+            ram = self.env.unwrapped.ram
+            OAM_BASE  = 0x0200
+            HUD_Y_MIN = 32    # ignorer HUD
+            ENEMY_PAL = 0x03  # palette 3 = ennemis NES
 
-            # Couleur Goomba/Mario en v3 : RGB(248, 56, 0) - tolérance ±15
-            r, g, b = ground_area[:, :, 0], ground_area[:, :, 1], ground_area[:, :, 2]
-            entity_mask = (
-                (r > 233) &
-                (g > 41) & (g < 71) &
-                (b < 15)
-            )
+            # Lire la position écran X de Mario depuis l'OAM (sprite 1 = corps haut gauche)
+            # Sprite 0 est le compteur HUD, sprite 1 est le premier sprite du corps de Mario
+            mario_x_oam = int(ram[OAM_BASE + 1*4 + 3])  # X du sprite 1
+            # Zone de menace : 15 à 70px devant Mario
+            threat_x_min = mario_x_oam + 15
+            threat_x_max = mario_x_oam + 70
+            # Zone verticale : sol uniquement (y NES > 60% de 240 = 144)
+            threat_y_min = int(obs.shape[0] * 0.60)  # 144
 
-            if not np.any(entity_mask):
-                return False
+            for i in range(64):
+                y_nes = int(ram[OAM_BASE + i*4 + 0])
+                attr  = int(ram[OAM_BASE + i*4 + 2])
+                x_nes = int(ram[OAM_BASE + i*4 + 3])
+                if y_nes < HUD_Y_MIN or y_nes >= 240:
+                    continue
+                if (attr & 0x03) != ENEMY_PAL:
+                    continue
+                if y_nes < threat_y_min:
+                    continue
+                # Ennemi dans la zone de menace ?
+                if threat_x_min <= x_nes <= threat_x_max:
+                    return True
 
-            # Mario est dans le tiers gauche de l'écran (~x=85 sur 256px)
-            # Bord droit de l'écran = 256 - 85 = 171px devant Mario
-            # Zone réflexe : 15 à 55px devant Mario
-            #   < 15px : risque de capter Mario lui-même (faux positif)
-            #   > 55px : ennemi trop loin pour stomp_enemy (15 frames right+A+B ≈ 50px max)
-            #            → laisser Claude approcher d'abord avec run_forward
-            mario_x_approx = width // 3
-            threat_zone = entity_mask[:, mario_x_approx + 15:mario_x_approx + 55]
-
-            # Au moins 4 pixels pour éviter le bruit
-            return int(np.sum(threat_zone)) >= 4
+            return False
 
         except Exception:
             return False
 
     def inject_emergency_jump(self):
-        """⚡ Injecte un saut d'urgence en TÊTE de queue et interrompt l'action en cours"""
+        """⚡ Injecte un saut long en TÊTE de queue et interrompt l'action en cours.
+        Utilise run_jump_over (right+A+B, 12f) plutôt que stomp_enemy (right+A, 20f) :
+        - Plus de vitesse horizontale (B = run) → ~150-200px de portée
+        - Dégager une paire de Goombas (x=295+x=305) en un seul saut
+        - stomp_enemy (right+A seulement) était trop court et Mario atterrissait sur le 2ème Goomba
+        """
         emergency = {
-            'macro_name': 'stomp_enemy',
-            'reasoning': '⚡ RÉFLEXE PIXEL: ennemi immédiat détecté (<55px)',
-            'strategy': 'Saut urgence',
+            'macro_name': 'run_jump_over',
+            'reasoning': '⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus',
+            'strategy': 'Saut urgence long',
             'urgency': 10,
             'confidence': 95
         }
@@ -2020,9 +2201,9 @@ ANALYSE REQUISE:
 ACTIONS INTERDITES (déjà échouées): {failed_str}
 
 🎯 DONNE 3-4 ACTIONS DIFFÉRENTES pour débloquer Mario!
-
-JSON compact:
-{{"actions":[{{"macro_action":"<nom>"}},{{"macro_action":"<nom>"}}],"strategy":"<stratégie de déblocage>","urgency":9}}"""
+⚠️ JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION:
+{{"actions":[{{"macro_action":"run_forward","px":80}},{{"macro_action":"pipe_jump"}}],"urgency":9}}
+(run_forward DOIT avoir px = pixels à parcourir)"""
 
         actions = self.parse_claude_actions(
             self.call_claude_for_macro(prompt)
@@ -2050,8 +2231,25 @@ JSON compact:
         macro_name = macro_decision['macro_name']
         macro_config = self.macro_actions[macro_name]
 
-        if 'phases' in macro_config:
-            # Macro multi-phases : phase 1 d'abord
+        px = macro_decision.get('px')
+
+        if macro_name == 'max_jump' and px is not None:
+            # max_jump avec px = approche N pixels vers la droite puis saut max
+            # Transformé en 2 phases : phase1=run_right(approach_frames), phase2=max_jump(40f)
+            approach_frames = max(3, min(80, round(int(px) / 2)))
+            self.current_macro = {
+                'name': macro_name,
+                'phases': [
+                    {'base_action': 3, 'duration': approach_frames},  # run right (B held)
+                    {'base_action': 4, 'duration': 40}  # right+A+B max jump
+                ],
+                'current_phase': 0,
+                'base_action': 3,
+                'frames_left': approach_frames,
+                'decision': macro_decision
+            }
+        elif 'phases' in macro_config:
+            # Macro multi-phases : phase 1 d'abord (durée fixe, px ignoré)
             self.current_macro = {
                 'name': macro_name,
                 'phases': macro_config['phases'],
@@ -2061,10 +2259,18 @@ JSON compact:
                 'decision': macro_decision
             }
         else:
+            # Pour les macros de mouvement (run_forward, walk_right...), Claude peut
+            # fournir un champ 'px' = distance en pixels NES à parcourir.
+            # Vitesse run_forward ≈ 2 px/frame → frames = px / 2.
+            # Sans 'px', on utilise la durée par défaut de la macro.
+            if px is not None:
+                frames = max(5, min(300, round(int(px) / 2)))
+            else:
+                frames = macro_config['duration']
             self.current_macro = {
                 'name': macro_name,
                 'base_action': macro_config['base_action'],
-                'frames_left': macro_config['duration'],
+                'frames_left': frames,
                 'decision': macro_decision
             }
         
@@ -2678,15 +2884,16 @@ JSON compact:
                 goomba_columns = np.any(goomba_brown_mask, axis=0)
                 goomba_x_positions = np.where(goomba_columns)[0]
                 
+                mario_screen_x = width // 3  # Mario est visuellement ~1/3 gauche de l'écran quand la caméra scroll
                 for goomba_x in goomba_x_positions:
-                    # Calculer position relative à Mario et distance
-                    distance_from_mario = abs(goomba_x - (mario_x % width))
+                    # distance en pixels écran (goomba_x et mario_screen_x sont tous deux en coords écran)
+                    distance_from_mario = goomba_x - mario_screen_x  # positif = devant Mario
                     enemies_list.append({
                         'type': 'Goomba',
                         'x': goomba_x,
                         'y': height - 50,  # Goombas sont au sol
                         'distance_from_mario': distance_from_mario,
-                        'threat_level': 'HIGH' if distance_from_mario < 30 else 'MEDIUM' if distance_from_mario < 60 else 'LOW'
+                        'threat_level': 'HIGH' if abs(distance_from_mario) < 30 else 'MEDIUM' if abs(distance_from_mario) < 60 else 'LOW'
                     })
             
             self.tracked_elements['enemies'] = enemies_list
@@ -2707,8 +2914,9 @@ JSON compact:
                 question_columns = np.any(question_air_mask, axis=0)
                 question_x_positions = np.where(question_columns)[0]
                 
+                mario_screen_x = width // 3
                 for block_x in question_x_positions:
-                    distance_from_mario = abs(block_x - (mario_x % width))
+                    distance_from_mario = block_x - mario_screen_x  # positif = devant Mario
                     question_blocks.append({
                         'type': 'QuestionBlock',
                         'x': block_x,
@@ -2828,9 +3036,10 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 
 🎯 DÉCISION RAPIDE (2-3 actions). Priorités: Survie > Trous⛰️ > Blocs ? > Progression.
 ⛰️ RAPPEL: Si TROU DÉTECTÉ → max_jump avant d'atteindre le bord!
+📐 run_forward DOIT avoir "px" ≤ 60 (1px écran = 1px NES, ≈2px/frame). max_jump accepte "px" = approche avant saut. Autres sauts = pas de px.
 
-Réponds en JSON compact:
-{{"actions":[{{"macro_action":"<nom>"}}],"strategy":"<court>","urgency":<1-10>,"next_target":"<prochain objectif>"}}"""
+⚠️ JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION:
+{{"actions":[{{"macro_action":"run_forward","px":80}},{{"macro_action":"<saut>"}}],"urgency":<1-10>}}"""
 
         return prompt
     
@@ -2854,6 +3063,7 @@ Réponds en JSON compact:
                 model="claude-3-haiku-20240307",
                 max_tokens=300,  # Plus petit que screenshot (seulement JSON)
                 temperature=0.1,
+                system="Tu es un contrôleur de jeu Mario. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après. Aucune explication, aucun commentaire.",
                 messages=[{
                     "role": "user",
                     "content": prompt
@@ -3195,16 +3405,22 @@ Réponds en JSON compact:
         if best_run_id:
             print(f"🏆 Meilleur run conservé: {best_run_id} ({best_x}px)")
 
-    def play_fluid_mario(self, max_steps=None):
-        """Jouer avec Mario fluide et Claude intelligent"""
+    def play_fluid_mario(self, max_steps=None, forced_game_mode=None):
+        """Jouer avec Mario fluide et Claude intelligent.
+        forced_game_mode: si fourni, bypasse le menu (ex: 'new_game' en mode auto-amélioration).
+        """
 
         # Timestamp de démarrage de session (pour le nettoyage des anciens historics)
         self._game_session_start = int(time.time())
 
-        # Afficher le menu de sélection
-        game_mode, selected_run_id = self.show_game_menu()
-        
+        if forced_game_mode:
+            game_mode, selected_run_id = forced_game_mode, None
+        else:
+            # Afficher le menu de sélection
+            game_mode, selected_run_id = self.show_game_menu()
+
         if game_mode == "quit":
+            self._exit_reason = "user_quit"
             print("👋 Au revoir!")
             return
 
@@ -3246,6 +3462,7 @@ Réponds en JSON compact:
         print("=" * 60)
         
         obs = self.env.reset()
+        self._raw_action_history.clear()
         total_reward = 0
         step_count = 0    # Steps totaux de la session (jamais réinitialisé, utilisé en interne)
         _life_step = 0    # Steps de la vie courante (reset à chaque respawn, pour affichage)
@@ -3316,27 +3533,27 @@ Réponds en JSON compact:
                                 print(f"Déclenchement Claude ({trigger_reason}) - thinking:{self.claude_thinking}, queue:{len(self.action_queue)}, step:{step_count}")
                                 self.call_claude_async(situation, obs, step_count)
 
-                            # Action d'urgence si on n'a rien - ATTENTE SÉCURISÉE
+                            # File vide : pause ou replay selon le contexte
                             if len(self.action_queue) == 0:
-                                if _phase3_safe_zone:
-                                    # Phase 3 zone safe : avancer par défaut (Claude bloqué)
+                                if _phase3_safe_zone or self._segment_in_replay:
+                                    # Replay / Phase 3 zone safe : avancer par défaut
                                     for _ in range(3):
                                         self.action_queue.append({
                                             'macro_name': 'run_forward',
-                                            'reasoning': 'Phase 3 zone safe: avance en attendant le prochain segment',
-                                            'strategy': 'Phase3 fallback', 'urgency': 5, 'confidence': 70
+                                            'reasoning': 'Replay: avance en attendant le prochain segment',
+                                            'strategy': 'Replay fallback', 'urgency': 5, 'confidence': 70
                                         })
                                     current_action = self.get_current_action()
-                                elif not self.claude_thinking:
-                                    # Claude n'est pas en train de réfléchir, on peut lui demander une action d'urgence
-                                    emergency_action = self.get_fallback_macro()
-                                    self.execute_macro_action(emergency_action)
-                                    current_action = self.get_current_action()
-                                    print("🚨 Attente sécurisée - Claude réfléchit...")
                                 else:
-                                    # Claude réfléchit, décision contextuelle selon dernière situation connue
-                                    current_action = self.get_contextual_fallback_action()
+                                    # MODE IA : PAUSE TOTALE
+                                    # env.step() ne sera PAS appelé → ennemis gelés, timer gelé
+                                    # Mario ne court plus dans les trous pendant que Claude réfléchit
+                                    current_action = None
+                                    if not getattr(self, '_pause_printed', False):
+                                        print("⏸  File vide — jeu en pause, Claude réfléchit...")
+                                        self._pause_printed = True
                             else:
+                                self._pause_printed = False
                                 # Utiliser l'action en queue
                                 current_action = self.get_current_action()
                     
@@ -3352,7 +3569,7 @@ Réponds en JSON compact:
                     )
                     reflex_ready = (
                         self.level_context_established and
-                        step_count - self.last_reflex_step >= 80 and
+                        step_count - self.last_reflex_step >= 25 and
                         current_macro_name in ('run_forward', 'walk_right', None) and
                         current_macro_name not in _JUMP_MACROS and
                         not _jump_in_queue
@@ -3361,7 +3578,7 @@ Réponds en JSON compact:
                         self.inject_emergency_jump()
                         current_action = self.get_current_action()
                         self.last_reflex_step = step_count
-                        print("⚡ RÉFLEXE v3: ennemi détecté, saut d'urgence!")
+                        print("⚡ RÉFLEXE v3: ennemi détecté → run_jump_over (35f, A+B) !")
 
                     # ⛰️ RÉFLEXE TROU : saut max automatique quand le sol est absent devant Mario
                     # Cooldown court (15 frames) — priorité absolue sur toute autre macro
@@ -3386,9 +3603,26 @@ Réponds en JSON compact:
                             print(f"⛰️ RÉFLEXE TROU [{severity}]: trou à {_hole['nearest']}px "
                                   f"(larg={_hole['width']}px) → max_jump!")
 
+                    # ⚠️ ZONE DANGER post-rewind : saut automatique si Mario approche de la mort précédente
+                    if (self._danger_zone_x is not None and
+                            current_macro_name not in _JUMP_MACROS and
+                            not _jump_in_queue and
+                            'real_info' in locals() and
+                            step_count - self.last_reflex_step >= 25):
+                        _cur_x = real_info.get('x_pos', 0)
+                        # Déclencher 40px avant la zone fatale
+                        if self._danger_zone_x - 40 <= _cur_x <= self._danger_zone_x + 10:
+                            self.inject_emergency_jump()
+                            current_action = self.get_current_action()
+                            self.last_reflex_step = step_count
+                            print(f"⚠️ ZONE DANGER: saut forcé à x={_cur_x} (mort précédente à x={self._danger_zone_x})")
+                            self._danger_zone_x = None  # utilisé, reset
+
                     # Exécuter l'action dans le jeu
+                    done = False  # valeur par défaut quand env.step() n'est pas appelé (pause)
                     if current_action is not None:
                         obs, reward, done, real_info = self.env.step(current_action)
+                        self._raw_action_history.append(int(current_action))
                         total_reward += reward
                         step_count += 1
                         _life_step += 1
@@ -3398,6 +3632,21 @@ Réponds en JSON compact:
                         if _seg_x > _run_max_x:
                             _run_max_x = _seg_x
                         self.segment_memory.record_position(_seg_x, step_count)
+
+                        # 💾 Checkpoint rewind (toutes les 60 frames)
+                        if step_count % 60 == 0 and not self._rewind_active:
+                            _ram_snap = self.env.unwrapped._ram_buffer().copy()
+                            _recent_macros = [m['name'] for m in list(self.macro_history)[-8:]]
+                            self.rewind_buffer.append({
+                                'step': step_count,
+                                'ram': _ram_snap,
+                                'x_pos': int(_seg_x),
+                                'macros': _recent_macros,
+                                'action_history': list(self._raw_action_history),
+                            })
+                            self.logger.log_game_event("REWIND_CHECKPOINT", step_count, {
+                                "x_pos": int(_seg_x), "buffer_size": len(self.rewind_buffer),
+                                "history_len": len(self._raw_action_history)})
 
                         # Détecter transition de segment (uniquement en avançant)
                         _new_seg_key = self.segment_memory._key(int(_seg_x))
@@ -3537,22 +3786,65 @@ Réponds en JSON compact:
                         _mem_x = real_info.get('x_pos', 0) if 'real_info' in locals() else 0
                         self.inject_known_solution(int(_mem_x), step_count)
 
-                    # 🚀 DÉCLENCHEMENT HYBRIDE OPTIMISÉ: Plus fréquent avec mises à jour positionnelles
+                    # 🚀 DÉCLENCHEMENT HYBRIDE OPTIMISÉ
                     # Bloqué pendant le replay d'un segment mémorisé ET toute la zone safe du Phase 3
-                    should_trigger_claude = (
-                        len(self.action_queue) <= 2 and not self.claude_thinking and
-                        step_count - self.last_positions_update >= self.positions_update_frequency and
+                    _not_replay_zone = (
                         not self._segment_in_replay and
                         not (self._run_phase == 3 and not self._phase3_ai_mode)
                     )
-                    
+                    # Déclenchement normal : queue presque vide
+                    _queue_trigger = (len(self.action_queue) <= 2 and
+                                      step_count - self.last_positions_update >= self.positions_update_frequency)
+                    # Déclenchement périodique : toutes les 60 frames même avec actions en queue
+                    # → Claude voit les nouveaux décors et ennemis apparus depuis le dernier appel
+                    _periodic_trigger = (len(self.action_queue) < 4 and
+                                         step_count - self.last_screenshot_step >= 60)
+                    # Déclenchement position : Mario a avancé >60px depuis dernier screenshot
+                    # → vider la queue + annuler call Claude en cours → pause/rescan immédiat
+                    # Fonctionne même pendant un saut (current_macro continue, mais queue vidée)
+                    _cur_x_for_trigger = real_info.get('x_pos', self.last_screenshot_x) if 'real_info' in locals() else self.last_screenshot_x
+                    _advanced_px = _cur_x_for_trigger - self.last_screenshot_x
+                    _currently_jumping = current_macro_name in _JUMP_MACROS
+                    _position_trigger = (
+                        _advanced_px >= 60 and
+                        _not_replay_zone
+                    )
+                    if _position_trigger:
+                        # Vider la queue → pause naturelle après le saut actuel
+                        self.action_queue.clear()
+                        # Si Claude pense encore sur des infos périmées → annuler son call
+                        if self.claude_thinking:
+                            self._claude_generation += 1
+                            self.claude_thinking = False
+                            _jump_note = " (en saut, rescan à l'atterrissage)" if _currently_jumping else ""
+                            print(f"📸 POSITION TRIGGER: Mario +{_advanced_px}px, call Claude annulé → rescan{_jump_note} (x={_cur_x_for_trigger})")
+                        else:
+                            _jump_note = " (en saut, rescan à l'atterrissage)" if _currently_jumping else ""
+                            print(f"📸 POSITION TRIGGER: Mario +{_advanced_px}px → pause forcée{_jump_note} (x={_cur_x_for_trigger})")
+
+                    should_trigger_claude = (
+                        not self.claude_thinking and
+                        (_queue_trigger or _periodic_trigger or _position_trigger) and
+                        _not_replay_zone
+                    )
+
                     if should_trigger_claude:
-                        trigger_type = "📍 Positions" if self.level_context_established else "📸 Initial"
-                        print(f"🚀 Déclenchement hybride {trigger_type} - queue:{len(self.action_queue)}, step:{step_count}")
+                        _why = "queue basse" if _queue_trigger else ("position +60px" if _position_trigger else "périodique 60f")
+                        trigger_type = "📸 Initial" if not self.level_context_established else "📸 Scan"
+                        print(f"🚀 Déclenchement {trigger_type} [{_why}] - queue:{len(self.action_queue)}, step:{step_count}")
                         
-                        situation = self.analyze_situation(obs, real_info if 'real_info' in locals() else {
-                            'x_pos': 40 + step_count * 2, 'y_pos': 200, 'score': total_reward
-                        }, step_count)
+                        # Après un rewind, utiliser real_info capturé pendant le replay
+                        # (évite d'envoyer la position de mort à Claude au lieu du checkpoint)
+                        _info_for_situation = (
+                            self._rewind_real_info or
+                            (real_info if 'real_info' in locals() else {
+                                'x_pos': 40 + step_count * 2, 'y_pos': 200, 'score': total_reward
+                            })
+                        )
+                        self._rewind_real_info = None  # consommé
+                        situation = self.analyze_situation(obs, _info_for_situation, step_count)
+                        # Mettre à jour la position de référence pour le prochain trigger position
+                        self.last_screenshot_x = situation.get('mario', {}).get('x', self.last_screenshot_x)
                         
                         # Enregistrer les stratégies qui marchent bien
                         if len(self.action_history) >= 3:
@@ -3621,9 +3913,136 @@ Réponds en JSON compact:
                                 print(f"ℹ️ Mort à x={mario_x_death} ignorée "
                                       f"(déjà dépassé en run précédent, record={self.segment_memory.furthest_x})")
                             
-                            # Vérifier si c'est vraiment game over (3 morts)
-                            if self.deaths_count >= 3:
-                                print("💀 GAME OVER - Mario a utilisé ses 3 vies!")
+                            # Tentative de rewind avant game over
+                            self.logger.log_game_event("DEATH_REWIND_CHECK", step_count, {
+                                "deaths": self.deaths_count, "rewind_count": self.rewind_count,
+                                "max_rewinds": self.max_rewinds, "buffer_len": len(self.rewind_buffer),
+                                "death_x": mario_x_death})
+                            if (self.deaths_count >= 1 and
+                                    self.rewind_count < self.max_rewinds and
+                                    self.rewind_buffer):
+                                # Choisir le checkpoint le plus éloigné de la zone de mort
+                                # (le plus ancien du buffer = le plus de marge avant le danger)
+                                checkpoint = self.rewind_buffer[0]
+                                self.logger.log_game_event("REWIND_START", step_count, {
+                                    "rewind_num": self.rewind_count + 1,
+                                    "checkpoint_x": checkpoint['x_pos'],
+                                    "checkpoint_step": checkpoint['step'],
+                                    "death_x": mario_x_death,
+                                    "cause": _death_cause})
+                                self.rewind_count += 1
+                                self._rewind_active = True
+
+                                # Restauration RAM sans env.reset() pour préserver le PPU.
+                                #
+                                # Problème de env.reset() + RAM restore :
+                                #   env.reset() réinitialise le PPU (nametables = tiles du début
+                                #   du niveau). Après restore RAM à x=1077+, le jeu tente de
+                                #   marcher sur des tiles qui n'existent pas → Mario tombe à
+                                #   travers le sol.
+                                #
+                                # Solution : effacer uniquement le flag `done` sur NESEnv
+                                # (seul vrai verrou de env.step()), puis restaurer la RAM.
+                                # Le PPU VRAM du jeu courant est préservé → collision correcte.
+                                checkpoint_ram = checkpoint.get('ram')
+                                self._raw_action_history.clear()
+                                _last_replay_info = {}
+                                if checkpoint_ram is not None:
+                                    # 1. Débloquer env.step() sans toucher au PPU
+                                    self.env.unwrapped.done = False
+                                    # 2. Restaurer l'état NES exact du checkpoint
+                                    np.copyto(self.env.unwrapped._ram_buffer(), checkpoint_ram)
+                                    # 3. NOOP pour rafraîchir l'écran et récupérer les infos
+                                    obs, _, _, _last_replay_info = self.env.step(0)
+                                    print(f"⏪ RAM restaurée (PPU intact) → x={checkpoint['x_pos']} "
+                                          f"(step={checkpoint['step']})")
+                                else:
+                                    # Fallback : replay complet depuis frame 0 si pas de snapshot
+                                    self.env.reset()
+                                    _replay_actions = checkpoint.get('action_history', [])
+                                    print(f"⏪ Fallback replay {len(_replay_actions)} actions "
+                                          f"(pas de snapshot RAM)")
+                                    _replay_died = False
+                                    for _ra in _replay_actions:
+                                        obs, _, _done, _last_replay_info = self.env.step(_ra)
+                                        if _done:
+                                            _replay_died = True
+                                            break
+                                    if _replay_died:
+                                        obs = self.env.reset()
+                                        _last_replay_info = {'x_pos': 40, 'y_pos': 200,
+                                                             'score': 0}
+                                        print("⚠️ Fallback replay mort — reset au début")
+                                # Stocker real_info du checkpoint (pas de la mort) pour
+                                # que le prochain analyze_situation ait la bonne position
+                                self._rewind_real_info = _last_replay_info
+
+                                # Préparer le message de correction pour le prochain appel Claude
+                                # (injecté en tête du prompt screenshot/texte via _rewind_correction_msg)
+                                cause_fr = {'enemy_hit': 'ennemi', 'fell_in_hole': 'trou', 'time_out': 'temps écoulé'}
+                                # Utiliser macro_history AU MOMENT DE LA MORT (pas du checkpoint)
+                                # pour avoir la vraie séquence fatale
+                                _death_macros = [m['name'] for m in list(self.macro_history)[-8:]]
+                                macros_str = ' → '.join(_death_macros) or '(aucune)'
+                                _danger_dist = mario_x_death - checkpoint['x_pos']
+                                # Enregistrer cette mort dans l'historique rewind
+                                self._death_positions.append({
+                                    'x': mario_x_death,
+                                    'y': _mario_y,
+                                    'cause': _death_cause,
+                                    'rewind': self.rewind_count,
+                                })
+                                # Construire la section historique si morts précédentes
+                                _prev_deaths = self._death_positions[:-1]  # toutes sauf la courante
+                                _history_lines = ""
+                                if _prev_deaths:
+                                    _h = ', '.join(
+                                        f"x={d['x']} y={d['y']} ({cause_fr.get(d['cause'], d['cause'])})"
+                                        for d in _prev_deaths
+                                    )
+                                    _history_lines = f"Morts précédentes dans ce run : {_h}\n"
+                                self._rewind_correction_msg = (
+                                    f"⏪ REWIND #{self.rewind_count}/{self.max_rewinds} — MARIO VIENT DE MOURIR !\n"
+                                    f"Position de mort : x={mario_x_death}, y={_mario_y}\n"
+                                    f"Cause : {cause_fr.get(_death_cause, _death_cause)}\n"
+                                    f"Séquence fatale : {macros_str}\n"
+                                    f"Zone dangereuse : à partir de x={mario_x_death - 20} "
+                                    f"(mort à {_danger_dist}px du checkpoint)\n"
+                                    f"{_history_lines}"
+                                    f"Le jeu est REMBOBINÉ à x={checkpoint['x_pos']}.\n"
+                                    f"OBLIGATOIRE : propose des actions DIFFÉRENTES — "
+                                    f"{'SAUTE par-dessus la zone x=' + str(mario_x_death) if _death_cause == 'enemy_hit' else 'EVITE le trou à x=' + str(mario_x_death) if _death_cause == 'fell_in_hole' else 'Avance vite avant le timer'}."
+                                )
+
+                                # Mémoriser la zone dangereuse (filet de sécurité : saut auto)
+                                self._danger_zone_x = mario_x_death
+                                # Invalider le thread Claude en cours (s'il y en a un)
+                                self._claude_generation += 1
+                                # Vider la queue → PAUSE automatique → Claude sera appelé au prochain cycle
+                                self.action_queue.clear()
+                                self.current_macro = None
+
+                                # Réinitialiser les compteurs de death pour continuer
+                                self.deaths_count -= 1  # Annuler la mort comptée
+                                self.rewind_buffer.clear()  # Vider le buffer après rewind
+                                # Réinitialiser les cooldowns réflexes
+                                self.last_reflex_step = step_count - 30  # réflexes actifs immédiatement
+                                self.last_hole_reflex_step = step_count - 20
+                                self.logger.log_game_event("REWIND_OK", step_count, {
+                                    "checkpoint_x": checkpoint['x_pos'],
+                                    "death_x": mario_x_death,
+                                    "deaths_count_after": self.deaths_count})
+                                # Ne PAS faire continue : laisser la boucle atteindre le display
+                                # pour que l'overlay REWIND soit visible une frame
+                                # _rewind_active sera remis à False après l'imshow
+                                done = False  # Empêcher le break en fin de bloc
+
+                            # Vérifier si c'est vraiment game over (1 vie = game over immédiat)
+                            # Skip si un rewind vient d'être appliqué ce frame
+                            if self._rewind_active:
+                                pass  # Le rewind gère la suite — aller vers le display
+                            elif self.deaths_count >= 1:
+                                print("💀 GAME OVER - Mario a perdu sa vie!")
                                 
                                 # Logger le game over
                                 self.logger.log_game_event("GAME_OVER", step_count, {
@@ -3652,6 +4071,7 @@ Réponds en JSON compact:
                                 self._life_macro_count = 0  # Reset du compteur de séquences affiché
                                 # Réinitialiser l'état pour la nouvelle vie
                                 obs = self.env.reset()
+                                self._raw_action_history.clear()
                                 self.current_macro = None
                                 self.position_history.clear()
                                 self.action_queue.clear()
@@ -3676,10 +4096,39 @@ Réponds en JSON compact:
                 situation = self.analyze_situation(obs, real_info if 'real_info' in locals() else {
                     'x_pos': 40 + step_count * 2, 'y_pos': 200, 'score': total_reward
                 }, step_count)
-                
+
                 display = self.create_display(obs, situation, last_mario_decision, total_reward, step_count)
+
+                # Overlay "PAUSE — Claude réfléchit" quand le jeu est gelé
+                _ia_paused = (current_action is None and not self._segment_in_replay
+                              and not paused)  # paused = pause ESPACE manuelle
+                if _ia_paused:
+                    h, w = display.shape[:2]
+                    cx, cy = w // 2, h // 2
+                    # Fond semi-transparent
+                    overlay = display.copy()
+                    cv2.rectangle(overlay, (cx - 210, cy - 22), (cx + 210, cy + 22), (0, 0, 0), -1)
+                    cv2.addWeighted(overlay, 0.65, display, 0.35, 0, display)
+                    # Texte
+                    label = "PAUSE  Claude reflechit..." if self.claude_thinking else "PAUSE  En attente..."
+                    cv2.putText(display, label, (cx - 200, cy + 8),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 230, 255), 2)
+
+                # Overlay "⏪ REWIND" quand le système de rewind est actif
+                if self._rewind_active:
+                    h, w = display.shape[:2]
+                    cx, cy = w // 2, h // 2
+                    overlay = display.copy()
+                    cv2.rectangle(overlay, (cx - 210, cy - 22), (cx + 210, cy + 22), (0, 0, 80), -1)
+                    cv2.addWeighted(overlay, 0.70, display, 0.30, 0, display)
+                    label = f"REWIND #{self.rewind_count}/{self.max_rewinds}  Claude corrige..."
+                    cv2.putText(display, label, (cx - 200, cy + 8),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (80, 80, 255), 2)
+
                 cv2.imshow('Mario Fluide - Claude LLM', display)
-                
+                if self._rewind_active:
+                    self._rewind_active = False  # Overlay montré, on réinitialise
+
                 # Contrôles (30 FPS pour être plus réactif avec Claude)
                 key = cv2.waitKey(33) & 0xFF  # ~30 FPS pour Claude
                 if key == 27:  # ESC
@@ -3827,17 +4276,24 @@ def main():
         try:
             mario_fluid = MarioFluidLLM()
 
-            # Lire le mode choisi au menu (show_game_menu est appelé dans play_fluid_mario)
-            # On intercepte le retour via un attribut positionné après le menu
-            mario_fluid.play_fluid_mario(max_steps=args.max_steps)
+            # En mode auto-amélioration, bypasser le menu et démarrer directement
+            fm = 'new_game' if auto_improve_mode else None
+            mario_fluid.play_fluid_mario(max_steps=args.max_steps, forced_game_mode=fm)
 
             # Vérifier si l'utilisateur a choisi le mode auto-amélioration au menu
             if getattr(mario_fluid, '_auto_improve_requested', False):
                 auto_improve_mode = True
                 print("\n🔄 Mode auto-amélioration activé!")
                 print("   Chaque fin de session déclenchera une analyse Claude automatique.")
-                continue  # Relancer pour jouer maintenant
+                print("   Appuyez sur Ctrl+C pour quitter la boucle.")
+                # Relancer immédiatement sans repasser par le menu
+                continue
 
+        except KeyboardInterrupt:
+            print("\n⛔ Arrêt demandé (Ctrl+C)")
+            if auto_improve_mode:
+                print("   Sortie du mode auto-amélioration.")
+            break
         except Exception as e:
             print(f"❌ Erreur: {e}")
             import traceback
@@ -3846,15 +4302,20 @@ def main():
         # Récupérer la raison d'arrêt depuis l'instance (si disponible)
         exit_reason = getattr(mario_fluid, '_exit_reason', 'unknown') if mario_fluid else 'error'
 
-        # --- Auto-amélioration post-session ---
-        if auto_improve_mode and exit_reason in ('game_over', 'victory', 'max_steps', 'user_esc', 'keyboard_interrupt'):
+        # Arrêts volontaires : toujours quitter, même en mode auto-amélioration
+        if exit_reason in ('keyboard_interrupt', 'user_esc', 'window_closed', 'user_quit'):
+            print("\n👋 À bientôt !")
+            break
+
+        # --- Auto-amélioration post-session (fins naturelles uniquement) ---
+        if auto_improve_mode and exit_reason in ('game_over', 'victory', 'max_steps'):
             print("\n🔬 Auto-amélioration : analyse de la session en cours...")
             try:
                 improver.run()
             except Exception as e:
                 print(f"⚠️  Erreur auto-amélioration: {e}")
 
-        # Redémarrage automatique en mode auto-amélioration ou après fin naturelle
+        # Redémarrage automatique après fin naturelle
         if auto_improve_mode or exit_reason in ('game_over', 'victory', 'max_steps'):
             print("\n" + "="*60)
             if auto_improve_mode:
@@ -3863,7 +4324,7 @@ def main():
                 print("🔄 Redémarrage automatique...")
             continue
 
-        # Arrêt volontaire hors mode auto (ESC, fenêtre fermée, Ctrl+C, erreur) → demander
+        # Autres cas (erreur inconnue) → demander
         print("\n" + "="*60)
         try:
             again = input("🔄 Nouvelle partie ? (o/N) : ").strip().lower()

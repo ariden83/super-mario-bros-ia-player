@@ -4,6 +4,7 @@ Système de logging complet pour Mario
 Enregistre toutes les actions, prompts, réponses et événements
 """
 
+import base64
 import logging
 import os
 import time
@@ -124,26 +125,41 @@ class MarioLogger:
         self.action_logger.info(f"ACTION - Step {int(step_count):4d} | {source:7s} | {action_name:20s} | Pos({int(position_x):4d},{int(position_y):3d}) | Score:{int(score):6d} | {reasoning}")
         self.main_logger.info(f"Mario action: {action_name} at step {step_count}")
     
-    def log_claude_prompt(self, prompt_type: str, prompt: str, step_count: int):
-        """Logger un prompt envoyé à Claude"""
-        prompt_short = prompt.replace('\n', ' ')[:100] + "..." if len(prompt) > 100 else prompt.replace('\n', ' ')
-        
-        self.claude_logger.info(f"PROMPT [{prompt_type}] - Step {step_count:4d} | Length: {len(prompt):4d} chars")
+    def log_claude_prompt(self, prompt_type: str, prompt: str, step_count: int,
+                          screenshot_b64: str = None):
+        """Logger un prompt envoyé à Claude, avec screenshot optionnel"""
+        prompt_short = prompt.replace('\n', ' ')
+
+        # Sauvegarder le screenshot en PNG si fourni
+        screenshot_filename = None
+        if screenshot_b64:
+            screenshot_filename = f"{self.session_id}_screenshot_step{step_count:04d}.png"
+            screenshot_path = os.path.join(self.log_dir, screenshot_filename)
+            try:
+                with open(screenshot_path, 'wb') as f:
+                    f.write(base64.b64decode(screenshot_b64))
+            except Exception:
+                screenshot_filename = None
+
+        screenshot_info = f" | Screenshot: {screenshot_filename}" if screenshot_filename else ""
+        self.claude_logger.info(f"PROMPT [{prompt_type}] - Step {step_count:4d} | Length: {len(prompt):4d} chars{screenshot_info}")
         self.claude_logger.info(f"PROMPT CONTENT: {prompt_short}")
-        
+
         # Sauvegarder le prompt complet dans un fichier séparé
         prompt_file = os.path.join(self.log_dir, f"{self.session_id}_prompts_full.txt")
         with open(prompt_file, 'a', encoding='utf-8') as f:
             f.write(f"\n{'='*80}\n")
             f.write(f"TIMESTAMP: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"TYPE: {prompt_type} | STEP: {step_count}\n")
-            f.write(f"{'='*80}\n")
+            f.write(f"TYPE: {prompt_type} | STEP: {step_count}")
+            if screenshot_filename:
+                f.write(f" | SCREENSHOT: {screenshot_filename}")
+            f.write(f"\n{'='*80}\n")
             f.write(prompt)
             f.write(f"\n{'='*80}\n\n")
     
     def log_claude_response(self, response: str, step_count: int, cost: float = 0.0):
         """Logger une réponse de Claude"""
-        response_short = response.replace('\n', ' ')[:100] + "..." if len(response) > 100 else response.replace('\n', ' ')
+        response_short = response.replace('\n', ' ')
         
         self.claude_logger.info(f"RESPONSE - Step {step_count:4d} | Length: {len(response):4d} chars | Cost: ${cost:.4f}")
         self.claude_logger.info(f"RESPONSE CONTENT: {response_short}")

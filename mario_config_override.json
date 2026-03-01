@@ -1,0 +1,57 @@
+{
+  "version": 3,
+  "parameters": {
+    "stuck_check_frequency": 30,
+    "positions_update_frequency": 5,
+    "known_solution_cooldown_px": 15,
+    "stuck_mode_max_tokens": 200,
+    "reflex_cooldown_frames": 120,
+    "hole_reflex_cooldown_frames": 15
+  },
+  "prompt_additions": {
+    "stuck_mode": [
+      "ALERTE BOUCLE: Si step_counter inchangé 5+ fois, tenter pipe_jump ou jump_high avant stomp.",
+      "Si step inchangé 10+ itérations: priorité pipe_jump/max_jump avant stomp. Ignorer solution mémorisée.",
+      "Si step_counter inchangé >500 frames: ignorer solutions mémorisées, forcer nouvelle stratégie avec max_jump ou obstacle_jump"
+    ],
+    "main_context": []
+  },
+  "improvement_history": [
+    {
+      "session_id": "mario_session_1772319949",
+      "timestamp": "2026-03-01T00:06:31.244802",
+      "analysis": "Mario est bloqué à x=744px pendant 352 steps consécutifs. Le step counter reste figé alors que les actions se répètent (stomp_enemy/run_forward en boucle). Le système replay_optimal_segment active en permanence mais ne progresse pas, indiquant une fausse détection de solution mémorisée.",
+      "root_cause": "Le système de mémorisation de solutions (x=436) s'active à tort après 3 confirmations alors que Mario est physiquement coincé. Les réflexes pixel (ennemi détecté) bloquent l'exécution de pipe_jump. La queue Claude reste vide (11 appels seulement pour 768 steps) car inject_known_solution domine.",
+      "applied": [
+        "  📐 stuck_check_frequency: 60 → 30 (Détecter les blocages 2x plus vite (tous les 30 steps au lieu de 60) pour éviter 350+ itérations stuck)",
+        "  📐 reflex_cooldown_frames: 80 → 120 (Augmenter le cooldown réflexe pour permettre pipe_jump d'exécuter sans être interrompu par stomp_enemy répété)",
+        "  📝 Prompt [stuck_mode]: \"ALERTE BOUCLE: Si step_counter inchangé 5+ fois, tenter pipe\""
+      ],
+      "priority": 9
+    },
+    {
+      "session_id": "mario_session_1772319991",
+      "timestamp": "2026-03-01T00:07:13.723599",
+      "analysis": "Mario progresse jusqu'à 704px mais reste bloqué à x=780px pendant 370 steps consécutifs. Les actions alternent entre stomp_enemy et run_forward sans avancer, avec un système de replay_optimal_segment activé en permanence qui ne produit aucune progression. Claude n'est appelé que 13 fois pour 790 steps, indiquant une queue saturée par des solutions mémorisées défectueuses.",
+      "root_cause": "Le système de mémorisation de solutions (x=436 confirmée 4x) détecte une fausse convergence dans une zone dangereuse avec ennemis. Le cooldown reflex (120 frames) empêche les alternatives comme pipe_jump de s'exécuter. La détection de blocage à stuck_check_frequency=30 ne suffit pas pour briser la boucle stomp/run déjà établie. Le système inject_known_solution domine et bloque l'accès au contexte Claude.",
+      "applied": [
+        "  📐 reflex_cooldown_frames: 120 → 80 (Réduire de 120 à 80 pour permettre aux réflexes pixel de se réinitialiser plus vite et laisser pipe_jump s'exécuter lors de détection de blocage sans être constant bloqué par stomp_enemy)",
+        "  📐 known_solution_cooldown_px: 40 → 20 (Réduire de 40 à 20 pour invalider plus rapidement les solutions mémorisées qui ne progressent pas (x=436 bloquée à x=780 pendant 350+ steps))",
+        "  📝 Prompt [stuck_mode]: \"Si step inchangé 10+ itérations: priorité pipe_jump/max_jump\""
+      ],
+      "priority": 8
+    },
+    {
+      "session_id": "mario_session_1772397138",
+      "timestamp": "2026-03-01T21:33:46.097860",
+      "analysis": "Mario progresse correctement jusqu'à x=2270px mais se bloque ensuite pendant 556 steps consécutifs (steps 1115 à 1671). Le step counter reste figé avec répétition infinie de run_forward/stomp_enemy/pipe_jump. Claude est appelé 23 fois pour 1795 steps, indiquant une queue saturée par des solutions mémorisées défectueuses qui ne progressent plus après x=2270px.",
+      "root_cause": "Le système de replay_optimal_segment s'active en boucle avec la solution mémorisée (x=436 confirmée 5x) après le franchissement du grand trou à x=2270px. Cette zone contient des ennemis rapprochés qui déclenchent le réflexe pixel en permanence, bloquant l'exécution de nouvelles actions Claude. Le reflex_cooldown_frames=80 n'est pas suffisant pour laisser le système tenter une solution différente. Mario atteint finalement x=3382px (positif) mais perd 556 steps inutiles dans la boucle.",
+      "applied": [
+        "  📐 reflex_cooldown_frames: 80 → 120 (Augmenter le cooldown réflexe pour permettre à Claude de proposer des actions alternatives (obstacle_jump, max_jump) sans être constamment interrompu par stomp_enemy lors de détection d'ennemis multiples au même endroit)",
+        "  📐 known_solution_cooldown_px: 20 → 15 (Réduire de 20 à 15 pixels pour invalider plus agressivement les solutions mémorisées qui stagnent. Une solution confirmée 5x mais qui ne progresse pas 556 steps doit être abandonnée immédiatement)",
+        "  📝 Prompt [stuck_mode]: \"Si step_counter inchangé >500 frames: ignorer solutions mémo\""
+      ],
+      "priority": 7
+    }
+  ]
+}
