@@ -1,0 +1,1322 @@
+[
+  {
+    "timestamp": 1.2996470928192139,
+    "step_count": 0,
+    "position_x": 40,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 2.613882541656494,
+    "step_count": 0,
+    "position_x": 40,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 6.10844349861145,
+    "step_count": 0,
+    "position_x": 40,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 8.55175495147705,
+    "step_count": 140,
+    "position_x": 320,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 191.0
+  },
+  {
+    "timestamp": 9.688698530197144,
+    "step_count": 140,
+    "position_x": 320,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 0,
+    "score": 191.0
+  },
+  {
+    "timestamp": 9.7833833694458,
+    "step_count": 168,
+    "position_x": 376,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 2.533333333333333,
+    "score": 240.0
+  },
+  {
+    "timestamp": 11.32274866104126,
+    "step_count": 168,
+    "position_x": 376,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 2.533333333333333,
+    "score": 240.0
+  },
+  {
+    "timestamp": 12.629791498184204,
+    "step_count": 168,
+    "position_x": 376,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 2.533333333333333,
+    "score": 240.0
+  },
+  {
+    "timestamp": 16.118667125701904,
+    "step_count": 168,
+    "position_x": 376,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 2.533333333333333,
+    "score": 240.0
+  },
+  {
+    "timestamp": 19.350393533706665,
+    "step_count": 355,
+    "position_x": 750,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 506.0
+  },
+  {
+    "timestamp": 20.66637897491455,
+    "step_count": 355,
+    "position_x": 750,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 506.0
+  },
+  {
+    "timestamp": 24.18660283088684,
+    "step_count": 355,
+    "position_x": 750,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 506.0
+  },
+  {
+    "timestamp": 25.418357610702515,
+    "step_count": 355,
+    "position_x": 750,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 0,
+    "score": 506.0
+  },
+  {
+    "timestamp": 26.94963312149048,
+    "step_count": 528,
+    "position_x": 1096,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 16.666666666666668,
+    "score": 715.0
+  },
+  {
+    "timestamp": 28.335683822631836,
+    "step_count": 559,
+    "position_x": 1158,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 16.133333333333333,
+    "score": 774.0
+  },
+  {
+    "timestamp": 30.134548902511597,
+    "step_count": 594,
+    "position_x": 1228,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 787.0
+  },
+  {
+    "timestamp": 31.452454090118408,
+    "step_count": 594,
+    "position_x": 1228,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 787.0
+  },
+  {
+    "timestamp": 34.02173829078674,
+    "step_count": 649,
+    "position_x": 1338,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 898.0
+  },
+  {
+    "timestamp": 35.856149673461914,
+    "step_count": 649,
+    "position_x": 1338,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 0,
+    "score": 898.0
+  },
+  {
+    "timestamp": 37.38864827156067,
+    "step_count": 649,
+    "position_x": 1338,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 898.0
+  },
+  {
+    "timestamp": 38.625767946243286,
+    "step_count": 649,
+    "position_x": 1338,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 0,
+    "score": 898.0
+  },
+  {
+    "timestamp": 39.638662815093994,
+    "step_count": 777,
+    "position_x": 1594,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 29.8,
+    "score": 1021.0
+  },
+  {
+    "timestamp": 75.30466318130493,
+    "step_count": 812,
+    "position_x": 1664,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 1091.0
+  },
+  {
+    "timestamp": 76.72240257263184,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 78.57058072090149,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 79.18253111839294,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 79.83753156661987,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 80.74976778030396,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 81.40886688232422,
+    "step_count": 840,
+    "position_x": 1720,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 1156.0
+  },
+  {
+    "timestamp": 83.17105340957642,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 84.70080351829529,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 85.92674446105957,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 87.47878313064575,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 89.12958216667175,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 90.50840210914612,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 91.69774341583252,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 94.99766087532043,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 96.16152906417847,
+    "step_count": 987,
+    "position_x": 2014,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 45.2,
+    "score": 1218.0
+  },
+  {
+    "timestamp": 97.62247204780579,
+    "step_count": 1335,
+    "position_x": 2710,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 99px (larg=31px) → saut max",
+    "mario_speed": 55.766666666666666,
+    "score": 1583.0
+  },
+  {
+    "timestamp": 99.27401804924011,
+    "step_count": 1375,
+    "position_x": 2790,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 14px (larg=17px) → saut max",
+    "mario_speed": 55.6,
+    "score": 1662.0
+  },
+  {
+    "timestamp": 99.94346618652344,
+    "step_count": 1391,
+    "position_x": 2822,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 56.5,
+    "score": 1652.0
+  },
+  {
+    "timestamp": 101.43458604812622,
+    "step_count": 1391,
+    "position_x": 2822,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 56.5,
+    "score": 1652.0
+  },
+  {
+    "timestamp": 103.05799770355225,
+    "step_count": 1456,
+    "position_x": 2952,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 1770.0
+  },
+  {
+    "timestamp": 103.45250582695007,
+    "step_count": 1456,
+    "position_x": 2952,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 99px (larg=31px) → saut max",
+    "mario_speed": 0,
+    "score": 1770.0
+  },
+  {
+    "timestamp": 105.2149510383606,
+    "step_count": 1505,
+    "position_x": 3050,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=22px) → saut max",
+    "mario_speed": 63.733333333333334,
+    "score": 1891.0
+  },
+  {
+    "timestamp": 137.77048516273499,
+    "step_count": 1545,
+    "position_x": 3130,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 1989.0
+  },
+  {
+    "timestamp": 139.0300793647766,
+    "step_count": 1545,
+    "position_x": 3130,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 98px (larg=47px) → saut max",
+    "mario_speed": 0,
+    "score": 1989.0
+  },
+  {
+    "timestamp": 140.7761652469635,
+    "step_count": 1614,
+    "position_x": 3268,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=37px) → saut max",
+    "mario_speed": 62.0,
+    "score": 2158.0
+  },
+  {
+    "timestamp": 142.5488464832306,
+    "step_count": 1654,
+    "position_x": 3348,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 61.333333333333336,
+    "score": 2256.0
+  },
+  {
+    "timestamp": 142.70295476913452,
+    "step_count": 1657,
+    "position_x": 3354,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 0.2,
+    "score": 2246.0
+  },
+  {
+    "timestamp": 144.8257508277893,
+    "step_count": 1692,
+    "position_x": 3424,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 2331.0
+  },
+  {
+    "timestamp": 147.57038640975952,
+    "step_count": 1720,
+    "position_x": 3480,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 2400.0
+  },
+  {
+    "timestamp": 148.0107181072235,
+    "step_count": 1720,
+    "position_x": 3480,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 98px (larg=47px) → saut max",
+    "mario_speed": 0,
+    "score": 2400.0
+  },
+  {
+    "timestamp": 149.76030707359314,
+    "step_count": 1720,
+    "position_x": 3480,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 2400.0
+  },
+  {
+    "timestamp": 149.76128458976746,
+    "step_count": 1720,
+    "position_x": 3480,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=37px) → saut max",
+    "mario_speed": 0,
+    "score": 2400.0
+  },
+  {
+    "timestamp": 151.51861143112183,
+    "step_count": 1810,
+    "position_x": 3660,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 71.73333333333333,
+    "score": 2621.0
+  },
+  {
+    "timestamp": 151.6708242893219,
+    "step_count": 1813,
+    "position_x": 3666,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 0.2,
+    "score": 2611.0
+  },
+  {
+    "timestamp": 153.22174191474915,
+    "step_count": 1813,
+    "position_x": 3666,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.2,
+    "score": 2611.0
+  },
+  {
+    "timestamp": 154.5257852077484,
+    "step_count": 1813,
+    "position_x": 3666,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0.2,
+    "score": 2611.0
+  },
+  {
+    "timestamp": 158.00500416755676,
+    "step_count": 1958,
+    "position_x": 3956,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=39px) → saut max",
+    "mario_speed": 84.8,
+    "score": 2829.0
+  },
+  {
+    "timestamp": 160.35046696662903,
+    "step_count": 1998,
+    "position_x": 4036,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 2900.0
+  },
+  {
+    "timestamp": 160.94040060043335,
+    "step_count": 2011,
+    "position_x": 4062,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 84.9,
+    "score": 2915.0
+  },
+  {
+    "timestamp": 162.4875795841217,
+    "step_count": 2046,
+    "position_x": 4132,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 95px (larg=47px) → saut max",
+    "mario_speed": 93.9,
+    "score": 2986.0
+  },
+  {
+    "timestamp": 164.24530148506165,
+    "step_count": 2086,
+    "position_x": 4212,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=34px) → saut max",
+    "mario_speed": 93.23333333333333,
+    "score": 3085.0
+  },
+  {
+    "timestamp": 164.47132110595703,
+    "step_count": 2091,
+    "position_x": 4222,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 93.06666666666666,
+    "score": 3080.0
+  },
+  {
+    "timestamp": 166.01928305625916,
+    "step_count": 2126,
+    "position_x": 4292,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 20px (larg=18px) → saut max",
+    "mario_speed": 96.73333333333333,
+    "score": 3165.0
+  },
+  {
+    "timestamp": 166.66713094711304,
+    "step_count": 2141,
+    "position_x": 4322,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 83px (larg=47px) → saut max",
+    "mario_speed": 96.5,
+    "score": 3185.0
+  },
+  {
+    "timestamp": 166.66769695281982,
+    "step_count": 2141,
+    "position_x": 4322,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 96.5,
+    "score": 3185.0
+  },
+  {
+    "timestamp": 168.1857500076294,
+    "step_count": 2141,
+    "position_x": 4322,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 96.5,
+    "score": 3185.0
+  },
+  {
+    "timestamp": 168.18686246871948,
+    "step_count": 2141,
+    "position_x": 4322,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=34px) → saut max",
+    "mario_speed": 96.5,
+    "score": 3185.0
+  },
+  {
+    "timestamp": 197.64186000823975,
+    "step_count": 2216,
+    "position_x": 4472,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3369.0
+  },
+  {
+    "timestamp": 197.7048180103302,
+    "step_count": 2217,
+    "position_x": 4474,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 98.4,
+    "score": 3354.0
+  },
+  {
+    "timestamp": 199.4219207763672,
+    "step_count": 2252,
+    "position_x": 4544,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3440.0
+  },
+  {
+    "timestamp": 199.4697606563568,
+    "step_count": 2252,
+    "position_x": 4544,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 0,
+    "score": 3440.0
+  },
+  {
+    "timestamp": 201.22979426383972,
+    "step_count": 2288,
+    "position_x": 4616,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3528.0
+  },
+  {
+    "timestamp": 203.0005805492401,
+    "step_count": 2318,
+    "position_x": 4676,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3602.0
+  },
+  {
+    "timestamp": 203.6797320842743,
+    "step_count": 2333,
+    "position_x": 4706,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 23px (larg=15px) → saut max",
+    "mario_speed": 101.3,
+    "score": 3622.0
+  },
+  {
+    "timestamp": 203.6805055141449,
+    "step_count": 2333,
+    "position_x": 4706,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 101.3,
+    "score": 3622.0
+  },
+  {
+    "timestamp": 205.2186450958252,
+    "step_count": 2368,
+    "position_x": 4776,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 110.03333333333333,
+    "score": 3708.0
+  },
+  {
+    "timestamp": 205.98661470413208,
+    "step_count": 2385,
+    "position_x": 4810,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 8px (larg=18px) → saut max",
+    "mario_speed": 109.66666666666667,
+    "score": 3732.0
+  },
+  {
+    "timestamp": 205.9872510433197,
+    "step_count": 2385,
+    "position_x": 4810,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 109.66666666666667,
+    "score": 3732.0
+  },
+  {
+    "timestamp": 207.53023886680603,
+    "step_count": 2385,
+    "position_x": 4810,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 109.66666666666667,
+    "score": 3732.0
+  },
+  {
+    "timestamp": 207.53102946281433,
+    "step_count": 2385,
+    "position_x": 4810,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 109.66666666666667,
+    "score": 3732.0
+  },
+  {
+    "timestamp": 207.9390459060669,
+    "step_count": 2429,
+    "position_x": 4898,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 112.7,
+    "score": 3822.0
+  },
+  {
+    "timestamp": 255.73840498924255,
+    "step_count": 2464,
+    "position_x": 4968,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3867.0
+  },
+  {
+    "timestamp": 257.0604977607727,
+    "step_count": 2464,
+    "position_x": 4968,
+    "position_y": 200,
+    "action_name": "obstacle_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3867.0
+  },
+  {
+    "timestamp": 259.68779826164246,
+    "step_count": 2464,
+    "position_x": 4968,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 3867.0
+  },
+  {
+    "timestamp": 260.9342529773712,
+    "step_count": 2582,
+    "position_x": 5204,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 114.46666666666667,
+    "score": 4136.0
+  },
+  {
+    "timestamp": 262.78172874450684,
+    "step_count": 2617,
+    "position_x": 5274,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4221.0
+  },
+  {
+    "timestamp": 263.8746495246887,
+    "step_count": 2617,
+    "position_x": 5274,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 0,
+    "score": 4221.0
+  },
+  {
+    "timestamp": 265.84021258354187,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 267.15859270095825,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 268.38604640960693,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 269.2605013847351,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 269.9136366844177,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 270.5698490142822,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 271.21853375434875,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 272.9597134590149,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 274.05857157707214,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 275.28253626823425,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 276.8216600418091,
+    "step_count": 2677,
+    "position_x": 5394,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4369.0
+  },
+  {
+    "timestamp": 278.9822120666504,
+    "step_count": 2958,
+    "position_x": 5956,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4571.0
+  },
+  {
+    "timestamp": 279.9345076084137,
+    "step_count": 2958,
+    "position_x": 5956,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4571.0
+  },
+  {
+    "timestamp": 280.5886330604553,
+    "step_count": 2958,
+    "position_x": 5956,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4571.0
+  },
+  {
+    "timestamp": 282.35368371009827,
+    "step_count": 2958,
+    "position_x": 5956,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 0,
+    "score": 4571.0
+  },
+  {
+    "timestamp": 316.32957911491394,
+    "step_count": 3060,
+    "position_x": 6160,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4622.0
+  },
+  {
+    "timestamp": 318.62175250053406,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 319.8575596809387,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "[stomp→jump] Saut par-dessus l'ennemi",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 321.373806476593,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 321.9984142780304,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 99px (larg=31px) → saut max",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 323.7661077976227,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 323.7670819759369,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 67px (larg=31px) → saut max",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 325.5256087779999,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 325.5266659259796,
+    "step_count": 3090,
+    "position_x": 6220,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 37px (larg=31px) → saut max",
+    "mario_speed": 0,
+    "score": 4695.0
+  },
+  {
+    "timestamp": 325.77527475357056,
+    "step_count": 3252,
+    "position_x": 6544,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 135.83333333333334,
+    "score": 4788.0
+  },
+  {
+    "timestamp": 328.13960313796997,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 329.4460003376007,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 332.93364334106445,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 334.2663872241974,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "pipe_jump",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 337.76203179359436,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Action Claude",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 337.7637906074524,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 80px (larg=31px) → saut max",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 339.52248907089233,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "run_forward",
+    "reasoning": "Reprendre la course après franchissement du trou",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 339.52333784103394,
+    "step_count": 3287,
+    "position_x": 6614,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 38px (larg=17px) → saut max",
+    "mario_speed": 0,
+    "score": 4803.0
+  },
+  {
+    "timestamp": 340.0630602836609,
+    "step_count": 3559,
+    "position_x": 7158,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 156.26666666666668,
+    "score": 4878.0
+  },
+  {
+    "timestamp": 341.5950355529785,
+    "step_count": 3594,
+    "position_x": 7228,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 83px (larg=31px) → saut max",
+    "mario_speed": 160.26666666666668,
+    "score": 4899.0
+  },
+  {
+    "timestamp": 343.3357150554657,
+    "step_count": 3634,
+    "position_x": 7308,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 38px (larg=17px) → saut max",
+    "mario_speed": 161.4,
+    "score": 4939.0
+  },
+  {
+    "timestamp": 343.79624462127686,
+    "step_count": 3644,
+    "position_x": 7328,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 73px (larg=31px) → saut max",
+    "mario_speed": 162.0,
+    "score": 4926.0
+  },
+  {
+    "timestamp": 343.7967562675476,
+    "step_count": 3644,
+    "position_x": 7328,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 162.0,
+    "score": 4926.0
+  },
+  {
+    "timestamp": 344.98249220848083,
+    "step_count": 3644,
+    "position_x": 7328,
+    "position_y": 200,
+    "action_name": "walk_right",
+    "reasoning": "Déblocage NES: marcher jusqu'au pied puis saut maximum",
+    "mario_speed": 162.0,
+    "score": 4926.0
+  },
+  {
+    "timestamp": 344.98347663879395,
+    "step_count": 3644,
+    "position_x": 7328,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 38px (larg=17px) → saut max",
+    "mario_speed": 162.0,
+    "score": 4926.0
+  },
+  {
+    "timestamp": 345.6967740058899,
+    "step_count": 3687,
+    "position_x": 7414,
+    "position_y": 200,
+    "action_name": "max_jump",
+    "reasoning": "⚡ RÉFLEXE TROU: sol absent à 47px (larg=31px) → saut max",
+    "mario_speed": 164.9,
+    "score": 4943.0
+  },
+  {
+    "timestamp": 345.69738149642944,
+    "step_count": 3687,
+    "position_x": 7414,
+    "position_y": 200,
+    "action_name": "run_jump_over",
+    "reasoning": "⚡ RÉFLEXE PIXEL: ennemi détecté → saut long par-dessus",
+    "mario_speed": 164.9,
+    "score": 4943.0
+  }
+]

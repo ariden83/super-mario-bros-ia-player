@@ -198,6 +198,8 @@ class MarioFluidLLM:
         # Couche réflexe pixel
         self.last_reflex_step = -25      # Cooldown réflexe ennemi (25 frames)
         self.last_hole_reflex_step = -60 # Cooldown réflexe trou (séparé)
+        self._hole_reflex_count = 0      # Nb de déclenchements consécutifs sans progression
+        self._hole_reflex_last_x = 0    # x_pos lors du dernier déclenchement réflexe trou
 
         # Système de rewind sur mort
         self.rewind_buffer = deque(maxlen=3)  # 3 checkpoints (60 frames d'écart)
@@ -206,6 +208,7 @@ class MarioFluidLLM:
         self._rewind_active = False            # Pour overlay visuel
         self._rewind_correction_msg = None     # Message injecté dans le prochain prompt Claude
         self._raw_action_history = []          # Historique brut des actions NES (pour replay PPU)
+        self._final_action_history = []        # Historique "propre" : tronqué aux checkpoints sur rewind
         self._claude_generation = 0            # Incrémenté à chaque rewind pour invalider threads en cours
         self._death_positions = []             # Historique des positions de mort pour le message rewind
         self._danger_zone_x = None             # Position X à éviter après rewind (filet de sécurité)
@@ -1187,8 +1190,9 @@ ACTIONS MARIO DISPONIBLES:
 - run_forward DOIT avoir "px" = pixels à parcourir (≈2px/frame). MAX 60px par action (ex: zone libre → 3x run_forward px=60).
   Exemples: ennemi à 80px → px=55 (s'arrêter à 25px, réflexe gère le stomp)
             tuyau à 120px → px=90 (s'arrêter devant), puis pipe_jump
-- max_jump PEUT avoir "px" = pixels d'approche AVANT le saut (ex: px=30 → avance 30px puis saute max).
-  Sans px : saute depuis position actuelle.
+- max_jump DOIT avoir "px" = pixels d'approche avant le saut quand le trou n'est pas immédiat.
+  Formule: px = distance_trou - 20 (ex: trou à 85px → px=65, trou à 30px → px=10, trou à 15px → sans px).
+  Sans px : saute immédiatement depuis position actuelle (seulement si trou < 20px).
 - Autres sauts (pipe_jump, stomp_enemy, obstacle_jump, run_jump_over) : PAS de px (durée fixe)
 
 Donne 3-5 actions. ⚠️ RÉPONDS EN JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION, ZÉRO COMMENTAIRE:
@@ -1307,15 +1311,28 @@ Donne 3-5 actions. ⚠️ RÉPONDS EN JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXP
         # ⛰️ Section trou pour le prompt
         hole_info = situation.get('holes', screen.get('holes', {}))
         if hole_info.get('detected'):
+            _h_near = hole_info['nearest']
+            _h_w    = hole_info['width']
+            # Calcul de l'approche optimale : s'arrêter ~20px avant le bord pour avoir de l'élan
+            _approach_px = max(0, _h_near - 20)
             if hole_info.get('critical'):
-                hole_section = (f"\n⛰️ TROU CRITIQUE: sol absent à {hole_info['nearest']}px devant Mario"
-                                f" (largeur {hole_info['width']}px) → max_jump MAINTENANT, PAS run_forward!")
+                if _approach_px <= 5:
+                    _hole_json = f'{{"macro_action":"max_jump"}}'
+                    _hole_hint = "saut immédiat sans approche"
+                else:
+                    _hole_json = f'{{"macro_action":"max_jump","px":{_approach_px}}}'
+                    _hole_hint = f"avance {_approach_px}px puis saute"
+                hole_section = (f"\n⛰️ TROU CRITIQUE: sol absent à {_h_near}px (largeur {_h_w}px)"
+                                f"\n→ {_hole_hint}: {{{_hole_json}}}")
             elif hole_info.get('urgent'):
-                hole_section = (f"\n⛰️ TROU URGENT à {hole_info['nearest']}px"
-                                f" (largeur {hole_info['width']}px) → max_jump EN PREMIER!")
+                _hole_json = f'{{"macro_action":"max_jump","px":{_approach_px}}}'
+                hole_section = (f"\n⛰️ TROU URGENT à {_h_near}px (largeur {_h_w}px)"
+                                f"\n→ avance {_approach_px}px puis saute max: {{{_hole_json}}}")
             else:
-                hole_section = (f"\n⛰️ TROU DÉTECTÉ à {hole_info['nearest']}px"
-                                f" (largeur {hole_info['width']}px) → préparer max_jump!")
+                _approach_px2 = max(0, _h_near - 30)
+                _hole_json = f'{{"macro_action":"max_jump","px":{_approach_px2}}}'
+                hole_section = (f"\n⛰️ TROU DÉTECTÉ à {_h_near}px (largeur {_h_w}px)"
+                                f"\n→ prépare: run_forward px={_approach_px2-40} puis {_hole_json}")
         else:
             hole_section = ""
 
@@ -1380,7 +1397,8 @@ Ennemi à 30px: {{"actions":[{{"macro_action":"stomp_enemy"}}],"urgency":10}}
 Ennemi à 80px: {{"actions":[{{"macro_action":"run_forward","px":55}},{{"macro_action":"stomp_enemy"}}],"urgency":8}}
 Tuyau à 100px: {{"actions":[{{"macro_action":"run_forward","px":70}},{{"macro_action":"pipe_jump"}}],"urgency":6}}
 Zone libre 200px: {{"actions":[{{"macro_action":"run_forward","px":200}}],"urgency":4}}
-Trou immédiat: {{"actions":[{{"macro_action":"max_jump"}}],"urgency":10}}
+Trou à 85px: {{"actions":[{{"macro_action":"max_jump","px":65}}],"urgency":10}}
+Trou à 20px: {{"actions":[{{"macro_action":"max_jump"}}],"urgency":10}}
 Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgency":5}}"""
 
         return prompt
@@ -2508,7 +2526,12 @@ ACTIONS INTERDITES (déjà échouées): {failed_str}
     def create_display(self, frame, situation, mario_decision, total_reward, step_count):
         """Créer l'affichage avec informations"""
         
-        display_frame = cv2.resize(frame, (600, 480))
+        # obs (gym) est en RGB, mais cv2.imshow attend du BGR → conversion obligatoire
+        # Sans ça, rouge↔bleu sont inversés : ciel orange, Mario bleu, etc.
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # INTER_NEAREST = pixel art NES authentique (chaque pixel NES → carré net, pas de flou)
+        # Le screenshot envoyé à Claude garde son propre pipeline (LANCZOS PIL + filtres + annotations)
+        display_frame = cv2.resize(frame_bgr, (600, 480), interpolation=cv2.INTER_NEAREST)
         # Agrandir le canvas pour inclure l'encart LLM en bas
         canvas = np.zeros((900, 1000, 3), dtype=np.uint8)
         
@@ -3114,60 +3137,38 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         print("🎮 MARIO FLUIDE - CLAUDE LLM")
         print("="*60)
         
-        # Afficher les statistiques
-        stats = self.history_manager.get_run_stats()
-        if stats.get("total_runs", 0) > 0:
-            print(f"📊 Statistiques actuelles:")
-            print(f"   🏃 Runs totaux: {stats['total_runs']}")
-            print(f"   🏆 Meilleure distance: {stats['best_distance']} pixels")
-            print(f"   🚀 Meilleure vitesse: {stats['best_speed']:.2f} px/s")
-            
-            # Afficher les runs disponibles
-            available_runs = self.history_manager.get_available_runs_for_replay()
-            if available_runs:
-                print(f"\n🔄 Runs disponibles pour replay:")
-                for i, run in enumerate(available_runs[:5], 1):  # Afficher les 5 meilleurs
-                    status_emoji = "🏆" if run.completion_status == "victory" else "💀" if run.completion_status == "death" else "⏸️"
-                    print(f"   {i}. {status_emoji} {run.run_id} - {run.max_position_x}px ({run.actions_count} actions)")
-        else:
-            print("📝 Aucun historique trouvé - Première partie!")
-        
         # Afficher l'état de la mémoire segments
         seg_mem = self.segment_memory
         if seg_mem.stage.sequences:
-            print(f"\n🧠 Mémoire segments: {seg_mem.total_runs} runs, "
+            print(f"🧠 Mémoire segments: {seg_mem.total_runs} runs, "
                   f"record={seg_mem.furthest_x}px, "
                   f"safe jusqu'à {seg_mem.stage.safe_max_x}px "
                   f"({len(seg_mem.stage.sequences)} segments mémorisés)")
         else:
-            print("\n🧠 Mémoire segments: vide")
+            print("🧠 Mémoire segments: vide (première partie)")
 
-        # Afficher l'état du config override
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as _f:
-                    _cfg = json.load(_f)
-                _v = _cfg.get("version", 0)
-                _hist = _cfg.get("improvement_history", [])
-                _last = _hist[-1] if _hist else None
-                print(f"\n⚙️  Config auto-amélioration: v{_v} "
-                      f"({'dernière: ' + _last['session_id'][-8:] if _last else 'vierge'})")
-            except Exception:
-                pass
+        # Vérifier s'il existe un run parfait sauvegardé
+        import glob as _glob
+        _perfect_files = _glob.glob(os.path.join(os.path.dirname(__file__) or '.', 'logs', 'perfect_run_*.json'))
+        _has_perfect = bool(_perfect_files)
 
         print("\n🎯 CHOISISSEZ VOTRE MODE:")
-        print("   1️⃣  Nouvelle partie (IA dès le début)")
-        print("   2️⃣  Reprendre de l'historique (replay + IA)")
-        print("   3️⃣  Boucle auto-amélioration 🔄 (jouer → analyser → améliorer → rejouer)")
-        print("   4️⃣  Effacer la mémoire des segments")
-        print("   5️⃣  Quitter")
+        print("   1️⃣  Nouvelle partie (IA pure, sans mémoire)")
+        print("   2️⃣  Mémoire automatique (rejoue les segments connus → IA à la frontière)")
+        if _has_perfect:
+            print("   3️⃣  ▶️  Rejouer le run parfait (sans pauses, sans IA)")
+            print("   4️⃣  Effacer la mémoire des segments")
+            print("   5️⃣  Quitter")
+        else:
+            print("   3️⃣  Effacer la mémoire des segments")
+            print("   4️⃣  Quitter")
 
+        _max_choice = "5" if _has_perfect else "4"
         try:
             while True:
                 try:
-                    choice = input("\n👉 Votre choix (1-5): ").strip()
+                    choice = input(f"\n👉 Votre choix (1-{_max_choice}): ").strip()
                 except EOFError:
-                    # Mode non-interactif détecté, choix automatique: nouvelle partie
                     print("Mode non-interactif détecté, sélection automatique: nouvelle partie")
                     choice = "1"
 
@@ -3175,15 +3176,14 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     self.logger.log_menu_choice("new_game")
                     return "new_game", None
                 elif choice == "2":
-                    if stats.get("total_runs", 0) == 0:
-                        print("❌ Aucun historique disponible! Nouvelle partie sélectionnée.")
-                        self.logger.log_menu_choice("new_game", "no_history_available")
-                        return "new_game", None
-                    return self.select_replay_run()
-                elif choice == "3":
-                    self.logger.log_menu_choice("auto_improve_loop")
-                    return "auto_improve", None
-                elif choice == "4":
+                    if not seg_mem.stage.sequences:
+                        print("⚠️  Mémoire vide — démarrage en IA pure (les segments seront mémorisés).")
+                    self.logger.log_menu_choice("memory_first")
+                    return "memory_first", None
+                elif choice == "3" and _has_perfect:
+                    self.play_perfect_replay()
+                    return self.show_game_menu()
+                elif choice == "3" and not _has_perfect:
                     confirm = input("⚠️  Confirmer l'effacement de la mémoire ? (o/N): ").strip().lower()
                     if confirm == "o":
                         self.segment_memory.clear_memory()
@@ -3192,11 +3192,20 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     else:
                         print("Annulé.")
                     return self.show_game_menu()
-                elif choice == "5":
+                elif choice == "4" and _has_perfect:
+                    confirm = input("⚠️  Confirmer l'effacement de la mémoire ? (o/N): ").strip().lower()
+                    if confirm == "o":
+                        self.segment_memory.clear_memory()
+                        print("✅ Mémoire effacée.")
+                        self.logger.log_menu_choice("clear_memory")
+                    else:
+                        print("Annulé.")
+                    return self.show_game_menu()
+                elif (choice == "4" and not _has_perfect) or (choice == "5" and _has_perfect):
                     self.logger.log_menu_choice("quit")
                     return "quit", None
                 else:
-                    print("❌ Choix invalide! Veuillez entrer 1, 2, 3, 4 ou 5.")
+                    print(f"❌ Choix invalide! Veuillez entrer 1-{_max_choice}.")
         except KeyboardInterrupt:
             return "quit", None
     
@@ -3322,6 +3331,68 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         self.replay_index += 1
         return current_action['base_action']
     
+    def _save_perfect_run(self):
+        """Sauvegarde _final_action_history dans logs/perfect_run_{ts}.json.
+        C'est le run sans les segments ratés (tronqué aux checkpoints à chaque rewind)."""
+        if not self._final_action_history:
+            return
+        import glob
+        logs_dir = os.path.join(os.path.dirname(__file__) or '.', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        # Garder seulement le dernier perfect_run (supprimer les anciens)
+        for old in glob.glob(os.path.join(logs_dir, 'perfect_run_*.json')):
+            os.remove(old)
+        ts = int(time.time())
+        path = os.path.join(logs_dir, f'perfect_run_{ts}.json')
+        with open(path, 'w') as f:
+            json.dump({'actions': self._final_action_history,
+                       'total': len(self._final_action_history)}, f)
+        print(f"💾 Run parfait sauvegardé : {len(self._final_action_history)} actions → {path}")
+
+    def play_perfect_replay(self):
+        """Rejoue _final_action_history à pleine vitesse, sans pause, sans Claude.
+        Affiche les graphismes NES bruts avec couleurs corrigées (RGB→BGR).
+        Le replay s'arrête à la fin des actions ou si l'utilisateur appuie sur ESC."""
+        import glob
+        logs_dir = os.path.join(os.path.dirname(__file__) or '.', 'logs')
+        # Chercher le dernier perfect_run sauvegardé
+        files = sorted(glob.glob(os.path.join(logs_dir, 'perfect_run_*.json')))
+        if not files:
+            print("⚠️  Aucun run parfait sauvegardé.")
+            return
+        with open(files[-1]) as f:
+            data = json.load(f)
+        actions = data['actions']
+        print(f"▶️  Replay parfait : {len(actions)} actions (ESC pour arrêter)")
+
+        env = gym_super_mario_bros.make('SuperMarioBros-1-1-v3')
+        env = JoypadSpace(env, SIMPLE_MOVEMENT)
+        obs = env.reset()
+
+        cv2.namedWindow('Mario — Replay Parfait', cv2.WINDOW_AUTOSIZE)
+        for i, action in enumerate(actions):
+            obs, _, done, info = env.step(action)
+            # Affichage NES couleurs réelles (RGB→BGR)
+            frame = cv2.cvtColor(obs, cv2.COLOR_RGB2BGR)
+            display = cv2.resize(frame, (600, 480), interpolation=cv2.INTER_NEAREST)
+            # Bandeau de progression
+            pct = int(100 * i / len(actions))
+            cv2.rectangle(display, (0, 0), (int(6 * pct), 6), (0, 255, 100), -1)
+            cv2.putText(display, f"REPLAY PARFAIT  {pct}%  x={info.get('x_pos',0)}",
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+            cv2.imshow('Mario — Replay Parfait', display)
+            key = cv2.waitKey(16) & 0xFF  # ~60 FPS
+            if key == 27:  # ESC
+                break
+            if done:
+                # Laisser voir la frame finale 1 seconde
+                cv2.waitKey(1000)
+                break
+
+        cv2.destroyWindow('Mario — Replay Parfait')
+        env.close()
+        print("✅ Replay terminé.")
+
     def _cleanup_screenshots(self):
         """Supprime tous les screenshots de débogage générés pendant la session."""
         import glob
@@ -3424,45 +3495,56 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             print("👋 Au revoir!")
             return
 
-        if game_mode == "auto_improve":
-            # Signaler à main() que l'utilisateur veut activer la boucle auto-amélioration
-            self._auto_improve_requested = True
-            self._exit_reason = "menu_auto_improve"
-            return
-
         # Configuration selon le mode
-        if game_mode == "replay" and selected_run_id:
-            if not self.setup_replay_mode(selected_run_id):
-                print("❌ Erreur configuration replay, passage en mode nouvelle partie")
-                game_mode = "new_game"
-        
-        if game_mode == "new_game":
+        if game_mode in ("new_game", "memory_first"):
             # Démarrer un nouveau run dans l'historique
             run_id = self.history_manager.start_new_run()
             self.current_run_started = True
             self.segment_memory.start_run(run_id)
 
-            # Vie 1 = Phase 1 (IA pure)
-            self._run_phase = 1
-            self._phase3_ai_mode = False
-            self._last_seg_key = None
-            self._segment_in_replay = False
-            print(f"🔄 Vie 1 → Phase 1: IA pure")
+            if game_mode == "memory_first":
+                # Phase 3 dès le départ : rejoue les segments mémorisés, IA à la frontière.
+                # Subtilités :
+                #   - inject_known_solution injecte les macros des segments déjà réussis
+                #   - Zone safe (_phase3_ai_mode=False) : run_forward sans pause (terrain connu)
+                #   - Au-delà de safe_max_x : _phase3_ai_mode=True → IA reprend la main
+                #   - Anti-blocage replay : si bloqué 40f sans avancer → IA immédiatement
+                #   - Rewinds illimités pour corriger les erreurs à la frontière
+                self._run_phase = 3
+                self._phase3_ai_mode = False
+                self._last_seg_key = None
+                self._segment_in_replay = False
+                seg_count = len(self.segment_memory.stage.sequences)
+                safe_x = self.segment_memory.stage.safe_max_x
+                print(f"🧠 Mode mémoire automatique — {seg_count} segments, safe jusqu'à x={safe_x}px")
+                print(f"🔄 Phase 3 : replay mémoire → IA frontière")
+            else:
+                # Phase 1 : IA pure
+                self._run_phase = 1
+                self._phase3_ai_mode = False
+                self._last_seg_key = None
+                self._segment_in_replay = False
+                print(f"🔄 Vie 1 → Phase 1: IA pure")
+
             print(f"🆕 Nouvelle partie - Run: {run_id}")
-            
-            # Logger le début de session
-            self.logger.log_session_start("new_game", run_id)
+            self.logger.log_session_start(game_mode, run_id)
         
         print("\n🎮 MARIO FLUIDE avec CLAUDE LLM")
         print("Claude donne des macro-actions, Mario les exécute fluidement!")
         print("=" * 60)
         
-        mode_display = "🔄 REPLAY + IA" if self.replay_mode else "🤖 IA COMPLÈTE"
+        if self.replay_mode:
+            mode_display = "🔄 REPLAY + IA"
+        elif game_mode == "memory_first":
+            mode_display = "🧠 MÉMOIRE AUTO → IA FRONTIÈRE"
+        else:
+            mode_display = "🤖 IA PURE"
         print(f"Mode: {mode_display}")
         print("=" * 60)
         
         obs = self.env.reset()
         self._raw_action_history.clear()
+        self._final_action_history.clear()
         total_reward = 0
         step_count = 0    # Steps totaux de la session (jamais réinitialisé, utilisé en interne)
         _life_step = 0    # Steps de la vie courante (reset à chaque respawn, pour affichage)
@@ -3550,7 +3632,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     # Mario ne court plus dans les trous pendant que Claude réfléchit
                                     current_action = None
                                     if not getattr(self, '_pause_printed', False):
-                                        print("⏸  File vide — jeu en pause, Claude réfléchit...")
+                                        print("⏸  File vide — en attente d'instructions...")
                                         self._pause_printed = True
                             else:
                                 self._pause_printed = False
@@ -3596,12 +3678,27 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     if reflex_hole_ready:
                         _hole = self.detect_holes_ahead(obs)
                         if _hole['detected'] and _hole['urgent']:
-                            self.inject_hole_jump(_hole)
-                            current_action = self.get_current_action()
-                            self.last_hole_reflex_step = step_count
-                            severity = "CRITIQUE" if _hole['critical'] else "URGENT"
-                            print(f"⛰️ RÉFLEXE TROU [{severity}]: trou à {_hole['nearest']}px "
-                                  f"(larg={_hole['width']}px) → max_jump!")
+                            _cur_x_hole = real_info.get('x_pos', 0) if 'real_info' in locals() else 0
+                            # Compteur de boucle : si Mario n'a pas avancé de ≥10px depuis le dernier réflexe
+                            if abs(_cur_x_hole - self._hole_reflex_last_x) < 10:
+                                self._hole_reflex_count += 1
+                            else:
+                                self._hole_reflex_count = 0
+                            self._hole_reflex_last_x = _cur_x_hole
+                            # Après 3 déclenchements sans progression → cooldown long (150f) pour laisser
+                            # Claude choisir une autre stratégie (ex: approach + max_jump avec px=30)
+                            if self._hole_reflex_count >= 3:
+                                print(f"⛰️ RÉFLEXE TROU boucle détectée ({self._hole_reflex_count}× à x={_cur_x_hole}) "
+                                      f"→ cooldown 150f, laisser Claude décider")
+                                self.last_hole_reflex_step = step_count + 135  # +135 = cooldown 150f total
+                                self._hole_reflex_count = 0
+                            else:
+                                self.inject_hole_jump(_hole)
+                                current_action = self.get_current_action()
+                                self.last_hole_reflex_step = step_count
+                                severity = "CRITIQUE" if _hole['critical'] else "URGENT"
+                                print(f"⛰️ RÉFLEXE TROU [{severity}] #{self._hole_reflex_count}: trou à {_hole['nearest']}px "
+                                      f"(larg={_hole['width']}px) → max_jump!")
 
                     # ⚠️ ZONE DANGER post-rewind : saut automatique si Mario approche de la mort précédente
                     if (self._danger_zone_x is not None and
@@ -3623,6 +3720,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     if current_action is not None:
                         obs, reward, done, real_info = self.env.step(current_action)
                         self._raw_action_history.append(int(current_action))
+                        self._final_action_history.append(int(current_action))
                         total_reward += reward
                         step_count += 1
                         _life_step += 1
@@ -3731,7 +3829,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         self._prev_coins = _new_coins
 
                     # 🔁 DÉTECTION DE BLOCAGE : position + répétition d'actions
-                    if self.level_context_established and not self.claude_thinking:
+                    if self.level_context_established:
                         current_x = real_info.get('x_pos', 0) if 'real_info' in locals() else 0
                         stuck_level = self.detect_stuck(current_x, step_count)
 
@@ -3946,6 +4044,9 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 # Le PPU VRAM du jeu courant est préservé → collision correcte.
                                 checkpoint_ram = checkpoint.get('ram')
                                 self._raw_action_history.clear()
+                                # Historique "propre" : on revient à l'état du checkpoint
+                                # (supprime les actions du segment raté)
+                                self._final_action_history = list(checkpoint.get('action_history', []))
                                 _last_replay_info = {}
                                 if checkpoint_ram is not None:
                                     # 1. Débloquer env.step() sans toucher au PPU
@@ -4018,6 +4119,11 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 self._danger_zone_x = mario_x_death
                                 # Invalider le thread Claude en cours (s'il y en a un)
                                 self._claude_generation += 1
+                                # Libérer le verrou claude_thinking pour que le prochain cycle
+                                # puisse déclencher un nouvel appel immédiatement sans attendre
+                                # que l'ancien thread API se termine (il verra generation != et
+                                # abandonnera ses résultats dans son finally).
+                                self.claude_thinking = False
                                 # Vider la queue → PAUSE automatique → Claude sera appelé au prochain cycle
                                 self.action_queue.clear()
                                 self.current_macro = None
@@ -4025,9 +4131,21 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 # Réinitialiser les compteurs de death pour continuer
                                 self.deaths_count -= 1  # Annuler la mort comptée
                                 self.rewind_buffer.clear()  # Vider le buffer après rewind
+                                # Sauvegarder immédiatement l'état restauré comme nouveau checkpoint.
+                                # Sans ça : si Mario re-meurt en 1-2 steps (ennemi à 2px), le buffer
+                                # est vide → pas de rewind possible → game over injuste.
+                                _post_rewind_ram = self.env.unwrapped._ram_buffer().copy()
+                                self.rewind_buffer.append({
+                                    'step': step_count,
+                                    'ram': _post_rewind_ram,
+                                    'x_pos': checkpoint['x_pos'],
+                                    'macros': [],
+                                    'action_history': list(self._final_action_history),
+                                })
                                 # Réinitialiser les cooldowns réflexes
                                 self.last_reflex_step = step_count - 30  # réflexes actifs immédiatement
                                 self.last_hole_reflex_step = step_count - 20
+                                self._hole_reflex_count = 0  # Reset compteur boucle trou
                                 self.logger.log_game_event("REWIND_OK", step_count, {
                                     "checkpoint_x": checkpoint['x_pos'],
                                     "death_x": mario_x_death,
@@ -4110,7 +4228,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     cv2.rectangle(overlay, (cx - 210, cy - 22), (cx + 210, cy + 22), (0, 0, 0), -1)
                     cv2.addWeighted(overlay, 0.65, display, 0.35, 0, display)
                     # Texte
-                    label = "PAUSE  Claude reflechit..." if self.claude_thinking else "PAUSE  En attente..."
+                    label = "PAUSE  Analyse IA en cours..." if self.claude_thinking else "PAUSE  En attente d'instructions"
                     cv2.putText(display, label, (cx - 200, cy + 8),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 230, 255), 2)
 
@@ -4177,6 +4295,9 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             }
 
             self.logger.log_session_end(final_stats)
+
+            # 💾 Sauvegarder le run parfait (historique tronqué aux rewinds)
+            self._save_perfect_run()
 
             cv2.destroyAllWindows()
             self.env.close()
@@ -4268,60 +4389,32 @@ def main():
         print("❌ ANTHROPIC_API_KEY requise!")
         return
 
-    improver = MarioAutoImprover(api_key)
-    auto_improve_mode = False  # Activé depuis le menu option 3
-
     while True:
         mario_fluid = None
         try:
             mario_fluid = MarioFluidLLM()
-
-            # En mode auto-amélioration, bypasser le menu et démarrer directement
-            fm = 'new_game' if auto_improve_mode else None
-            mario_fluid.play_fluid_mario(max_steps=args.max_steps, forced_game_mode=fm)
-
-            # Vérifier si l'utilisateur a choisi le mode auto-amélioration au menu
-            if getattr(mario_fluid, '_auto_improve_requested', False):
-                auto_improve_mode = True
-                print("\n🔄 Mode auto-amélioration activé!")
-                print("   Chaque fin de session déclenchera une analyse Claude automatique.")
-                print("   Appuyez sur Ctrl+C pour quitter la boucle.")
-                # Relancer immédiatement sans repasser par le menu
-                continue
+            mario_fluid.play_fluid_mario(max_steps=args.max_steps)
 
         except KeyboardInterrupt:
             print("\n⛔ Arrêt demandé (Ctrl+C)")
-            if auto_improve_mode:
-                print("   Sortie du mode auto-amélioration.")
             break
         except Exception as e:
             print(f"❌ Erreur: {e}")
             import traceback
             traceback.print_exc()
 
-        # Récupérer la raison d'arrêt depuis l'instance (si disponible)
+        # Récupérer la raison d'arrêt
         exit_reason = getattr(mario_fluid, '_exit_reason', 'unknown') if mario_fluid else 'error'
 
-        # Arrêts volontaires : toujours quitter, même en mode auto-amélioration
+        # Arrêts volontaires → quitter
         if exit_reason in ('keyboard_interrupt', 'user_esc', 'window_closed', 'user_quit'):
             print("\n👋 À bientôt !")
             break
 
-        # --- Auto-amélioration post-session (fins naturelles uniquement) ---
-        if auto_improve_mode and exit_reason in ('game_over', 'victory', 'max_steps'):
-            print("\n🔬 Auto-amélioration : analyse de la session en cours...")
-            try:
-                improver.run()
-            except Exception as e:
-                print(f"⚠️  Erreur auto-amélioration: {e}")
-
-        # Redémarrage automatique après fin naturelle
-        if auto_improve_mode or exit_reason in ('game_over', 'victory', 'max_steps'):
+        # Fin naturelle (game_over, victoire, max_steps) → retour au menu automatiquement
+        if exit_reason in ('game_over', 'victory', 'max_steps'):
             print("\n" + "="*60)
-            if auto_improve_mode:
-                print("🔄 Boucle auto-amélioration : nouvelle partie...")
-            else:
-                print("🔄 Redémarrage automatique...")
+            print("🔄 Retour au menu...")
             continue
 
         # Autres cas (erreur inconnue) → demander
