@@ -18,7 +18,13 @@ from typing import List, Dict, Optional
 
 
 SEGMENT_SIZE = 100  # pixels par zone
-MEMORY_PATH = os.path.join(os.path.dirname(__file__), "memory", "segment_memory.json")
+MEMORY_DIR = os.path.join(os.path.dirname(__file__), "memory")
+MEMORY_PATH = os.path.join(MEMORY_DIR, "segment_memory_1-1.json")  # défaut : World 1-1
+
+
+def get_memory_path(world: int, level: int) -> str:
+    """Retourne le chemin du fichier de mémoire pour un niveau donné."""
+    return os.path.join(MEMORY_DIR, f"segment_memory_{world}-{level}.json")
 
 # Macros qui frappent des blocs ? directement (sans nécessiter détection coin/score)
 BLOCK_HIT_MACROS = {'approach_and_hit_block', 'hit_block'}

@@ -26,8 +26,30 @@ from mario_history_manager import MarioHistoryManager
 from mario_logger import MarioLogger
 from mario_level_database import MarioLevelDatabase
 from distance_converter import DistanceConverter
-from mario_segment_memory import MarioSegmentMemory
+from mario_segment_memory import MarioSegmentMemory, get_memory_path
 from mario_auto_improver import MarioAutoImprover, CONFIG_FILE, TUNABLE_PARAMS
+
+# Séquence complète des niveaux Super Mario Bros (World 1-1 → World 8-4)
+LEVEL_SEQUENCE = [
+    (1,1),(1,2),(1,3),(1,4),
+    (2,1),(2,2),(2,3),(2,4),
+    (3,1),(3,2),(3,3),(3,4),
+    (4,1),(4,2),(4,3),(4,4),
+    (5,1),(5,2),(5,3),(5,4),
+    (6,1),(6,2),(6,3),(6,4),
+    (7,1),(7,2),(7,3),(7,4),
+    (8,1),(8,2),(8,3),(8,4),
+]
+
+def get_next_level(world: int, level: int):
+    """Retourne (next_world, next_level) ou None si dernier niveau."""
+    try:
+        idx = LEVEL_SEQUENCE.index((world, level))
+        if idx + 1 < len(LEVEL_SEQUENCE):
+            return LEVEL_SEQUENCE[idx + 1]
+    except ValueError:
+        pass
+    return None
 
 class MarioFluidLLM:
     def __init__(self):
@@ -177,8 +199,8 @@ class MarioFluidLLM:
         self.replay_index = 0
         self.replay_ai_takeover_point = 0  # Point où l'IA reprend la main
         
-        # Mémoire persistante par segments
-        self.segment_memory = MarioSegmentMemory()
+        # Mémoire persistante par segments (fichier séparé par niveau)
+        self.segment_memory = MarioSegmentMemory(get_memory_path(self.current_world, self.current_level))
         self._prev_score = 0       # Pour détecter gains de points
         self._prev_coins = 0       # Pour détecter pièces collectées
         self._prev_lives = 3       # Pour détecter les morts
@@ -208,7 +230,9 @@ class MarioFluidLLM:
         self._rewind_active = False            # Pour overlay visuel
         self._rewind_correction_msg = None     # Message injecté dans le prochain prompt Claude
         self._raw_action_history = []          # Historique brut des actions NES (pour replay PPU)
-        self._final_action_history = []        # Historique "propre" : tronqué aux checkpoints sur rewind
+        self._final_action_history = []        # Historique post-dernier-rewind (actions depuis le checkpoint)
+        self._perfect_start_ram = None         # Snapshot RAM du dernier checkpoint rewind (pour replay fidèle)
+        self._perfect_start_x = 0             # x_pos du dernier checkpoint rewind
         self._claude_generation = 0            # Incrémenté à chaque rewind pour invalider threads en cours
         self._death_positions = []             # Historique des positions de mort pour le message rewind
         self._danger_zone_x = None             # Position X à éviter après rewind (filet de sécurité)
@@ -220,6 +244,7 @@ class MarioFluidLLM:
         self.stuck_check_frequency = 60   # Vérifier toutes les 60 steps (pipe_jump = 80 frames, ok car inject_known_solution cooldown protège)
         self.last_stuck_position = None  # Position au dernier check
         self.stuck_search_done = set()   # Positions déjà cherchées (évite doublons)
+        self._blocked_macros_by_pos = {}  # {bucket_50px: set(macro_names)} — macros échouées par zone
 
         # Système hybride optimisé screenshot + positions
         self.level_context_established = False  # Si Claude a la carte du niveau
@@ -1106,10 +1131,18 @@ class MarioFluidLLM:
                 _rewind_block = self._rewind_correction_msg + "\n\n"
                 self._rewind_correction_msg = None  # Consommé, ne pas répéter
 
+            # Section macros bloquées à la position courante
+            _ss_bucket = int(mario_x // 50) * 50
+            _ss_blocked = getattr(self, '_blocked_macros_by_pos', {}).get(_ss_bucket, set())
+            if _ss_blocked:
+                _ss_blocked_block = f"\n⛔ ACTIONS DÉJÀ ESSAYÉES SANS SUCCÈS à x≈{_ss_bucket}: {', '.join(sorted(_ss_blocked))}\n→ N'utilise PAS ces actions — elles ont déjà échoué à cette position!\n"
+            else:
+                _ss_blocked_block = ""
+
             prompt = _rewind_block + f"""Tu es Claude, expert Mario Bros ! Analyse cette capture d'écran du jeu en temps réel.
 
 CONTEXTE DÉTAILLÉ MARIO:
-🔹 Position monde: X={mario_x}px (coord NES absolue depuis début niveau), Y={mario_y}px
+🔹 Position monde: X={mario_x}px (coord NES absolue depuis début niveau), Y={mario_y}px{_ss_blocked_block}
 🔹 Ecran NES: {screen_width}x240px — Mario apparaît visuellement vers le tiers gauche de l'écran (~80px) quand la caméra scroll
 🔹 Vitesse: {mario_speed:.1f} pixels/step ({'vers droite' if mario_speed > 0 else 'stationnaire' if mario_speed == 0 else 'vers gauche'})
 🔹 Score: {mario['score']} | Step: {step_count}
@@ -1342,11 +1375,19 @@ Donne 3-5 actions. ⚠️ RÉPONDS EN JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXP
             _rewind_block = self._rewind_correction_msg + "\n\n"
             self._rewind_correction_msg = None  # Consommé
 
+        # Section macros bloquées à la position courante
+        _mario_bucket = int(mario['x'] // 50) * 50
+        _blocked_here = getattr(self, '_blocked_macros_by_pos', {}).get(_mario_bucket, set())
+        if _blocked_here:
+            _blocked_section = f"\n⛔ ACTIONS DÉJÀ ESSAYÉES SANS SUCCÈS à x≈{_mario_bucket}: {', '.join(sorted(_blocked_here))}\n→ N'utilise PAS ces actions — elles ont déjà échoué à cette position!"
+        else:
+            _blocked_section = ""
+
         prompt = _rewind_block + f"""🍄 Tu es Claude, EXPERT MARIO BROS NES ! Mario a besoin de 2-3 actions RAPIDES car le jeu est dangereux !
 
 📍 SITUATION MARIO:
 • Position: X={mario['x']}, Y={mario['y']} | Score: {mario['score']} | Step: {situation['step']}
-• Progression: {progress['status']} (tendance: {progress['trend']}px)
+• Progression: {progress['status']} (tendance: {progress['trend']}px){_blocked_section}
 
 🔍 ANALYSE VISUELLE MARIO BROS:
 • Obstacles: {'OUI' if screen['immediate_obstacles'] else 'NON'} | Sol stable: {'OUI' if screen['ground_stable'] else 'NON'}
@@ -1468,8 +1509,11 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgenc
             try:
                 # 🧠 DÉCISION HYBRIDE: Screenshot complet vs Mise à jour positionnelle
                 use_screenshot, reason = self.should_use_screenshot_vs_positions(step_count)
-                
-                print(f"🤖 Mode hybride: {'📸 Screenshot' if use_screenshot else '📍 Positions'} - {reason}")
+
+                _mario_x = situation.get('mario', {}).get('x', '?')
+                _mode_label = "📸 Screenshot" if use_screenshot else "📍 Positions"
+                self.add_llm_response('APPEL', f"{_mode_label} | x={_mario_x} | {reason}", step_count)
+                print(f"🤖 Mode hybride: {_mode_label} - {reason}")
                 
                 if use_screenshot:
                     # MODE SCREENSHOT COMPLET (établir contexte ou recalibrage)
@@ -1526,6 +1570,15 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgenc
                 # Si la génération a changé, les actions sont périmées → les ignorer.
                 if generation != self._claude_generation:
                     print(f"⚠️ Thread Claude périmé (gen {generation} → {self._claude_generation}), actions ignorées")
+                    self.add_llm_response('ANNULE', f"Call annulé (rewind/rescan) — gen {generation}→{self._claude_generation}", step_count)
+                    # Si la queue est vide et aucun nouveau thread actif, injecter run_forward
+                    # pour éviter que Mario soit gelé en PAUSE indéfiniment
+                    if len(self.action_queue) == 0 and generation + 1 == self._claude_generation:
+                        self.action_queue.append({
+                            'macro_name': 'run_forward',
+                            'reasoning': '[post-annule] Maintenir le mouvement en attendant nouveau call',
+                            'strategy': 'Fallback annulation', 'urgency': 1, 'confidence': 50, 'px': 30
+                        })
                     return
 
                 # Règles de filtrage :
@@ -1554,6 +1607,14 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgenc
                                           reasoning='[stomp→jump] Saut par-dessus l\'ennemi')
                         self.action_queue.append(action)
                 
+                # Construire résumé lisible des actions pour le panel
+                _action_parts = []
+                for a in actions:
+                    _n = a.get('macro_name', '?')
+                    _px = a.get('px')
+                    _action_parts.append(f"{_n}({_px}px)" if _px else _n)
+                _actions_str = " → ".join(_action_parts) if _action_parts else "aucune action"
+                self.add_llm_response('ACTIONS', _actions_str, step_count)
                 print(f"✅ Claude ({analysis_type}) a fourni {len(actions)} actions")
                 
             except Exception as e:
@@ -1563,8 +1624,12 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgenc
                 self.action_queue.append(fallback)
             
             finally:
-                self.claude_thinking = False
-        
+                # Ne reset le flag que si ce thread est encore le thread actif.
+                # Si la génération a changé (rewind, position trigger), un nouveau thread
+                # est peut-être déjà en cours → ne pas tuer son flag claude_thinking.
+                if generation == self._claude_generation:
+                    self.claude_thinking = False
+
         if not self.claude_thinking:
             self.claude_thinking = True
             self.claude_thread = threading.Thread(target=claude_worker)
@@ -1938,6 +2003,72 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":100}}],"urgenc
         self.action_queue.append(run_after)
         self.current_macro = None
 
+    def detect_obstacle_height(self, obs):
+        """📏 Détecte la hauteur d'un obstacle (tuyau/mur) devant Mario via analyse pixel.
+
+        Principe : dans les colonnes 10-50px devant Mario, cherche la frontière
+        entre le ciel (bleu) et un obstacle (brun/vert) en partant du SOL vers le HAUT,
+        limitée à 55px max (hauteur max d'un tuyau dans W1-1).
+
+        Retourne :
+            height_px : int  — hauteur de l'obstacle en pixels écran (0 si rien)
+            jump_type : str  — 'none' | 'max_jump' | 'pipe_jump' | 'obstacle_jump'
+        """
+        try:
+            h, w = obs.shape[:2]
+            game_top = int(h * 0.20)
+            game_h = h - game_top
+
+            mario_screen_x = w // 3
+
+            # Colonnes à scanner : 10 à 45px devant Mario (évite Mario lui-même)
+            scan_start = mario_screen_x + 10
+            scan_end = min(mario_screen_x + 45, w - 1)
+
+            # Sol approximatif : derniers 15% de la zone de jeu
+            floor_y = game_top + int(game_h * 0.85)
+
+            # Déterminer la couleur du ciel : couleur dominante dans le haut de l'écran
+            sky_row = obs[game_top + 5, scan_start:scan_end]
+            sky_r = int(np.median(sky_row[:, 0]))
+            sky_g = int(np.median(sky_row[:, 1]))
+            sky_b = int(np.median(sky_row[:, 2]))
+
+            # Scanner UNIQUEMENT les 55 pixels au-dessus du sol (hauteur max tuyau W1-1)
+            # On cherche la PLUS HAUTE rangée qui n'est PAS du ciel → top de l'obstacle
+            max_obstacle_height = 55
+            obstacle_top_y = floor_y  # par défaut : pas d'obstacle
+            for y in range(floor_y - 1, max(floor_y - max_obstacle_height, game_top), -1):
+                row = obs[y, scan_start:scan_end]
+                r = row[:, 0].astype(np.int16)
+                g = row[:, 1].astype(np.int16)
+                b = row[:, 2].astype(np.int16)
+                # Pixel "ciel" = proche de la couleur du ciel détectée
+                is_sky = ((np.abs(r - sky_r) < 25) &
+                          (np.abs(g - sky_g) < 25) &
+                          (np.abs(b - sky_b) < 25))
+                # Pixel "obstacle" = rouge/brun (brique) ou vert (tuyau), PAS ciel
+                is_obstacle = (~is_sky) & ((r > 80) | (g > 80)) & (np.abs(r.astype(float) - b) > 20)
+                if np.any(is_obstacle):
+                    obstacle_top_y = y  # continue à monter
+                else:
+                    break  # rangée de ciel = sommet de l'obstacle
+
+            height_px = floor_y - obstacle_top_y
+            # Seuil minimum : 8px pour éviter les faux positifs (tuiles de sol, etc.)
+            if height_px < 8:
+                return {'height_px': 0, 'jump_type': 'none'}
+            elif height_px <= 20:
+                jump_type = 'max_jump'       # Obstacle bas : saut simple suffisant
+            elif height_px <= 40:
+                jump_type = 'pipe_jump'      # Tuyau standard (~32px = 2 tuiles)
+            else:
+                jump_type = 'obstacle_jump'  # Obstacle élevé (~48px = 3 tuiles)
+
+            return {'height_px': height_px, 'jump_type': jump_type}
+        except Exception:
+            return {'height_px': 0, 'jump_type': 'none'}
+
     def _inject_segment_replay(self, sequence: List[tuple], x: int):
         """Injecte une séquence mémorisée dans la queue et passe en mode replay.
         Ne coupe PAS la macro en cours : si Mario est en plein saut lors d'une
@@ -2151,6 +2282,13 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
         if position_stuck and action_stuck:
             self.stuck_counter += 1
             print(f"🔁 Blocage détecté (niveau {self.stuck_counter}) à x={current_x:.0f} - action répétée: {most_common}")
+            # Mémoriser l'action échouée dans le bucket 50px
+            _bucket = int(current_x // 50) * 50
+            if _bucket not in self._blocked_macros_by_pos:
+                self._blocked_macros_by_pos[_bucket] = set()
+            # Ajouter toutes les macros répétées récentes comme échouées
+            for _m in recent:
+                self._blocked_macros_by_pos[_bucket].add(_m['name'])
         elif not position_stuck:
             self.stuck_counter = 0  # Mario a avancé, réinitialiser
 
@@ -2194,6 +2332,76 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
 
         return None
 
+    def _transition_to_level(self, world: int, level: int, step_count: int) -> bool:
+        """Transition vers un nouveau niveau : recréer l'env, charger la mémoire dédiée.
+        Retourne True si la transition a réussi, False en cas d'erreur."""
+        try:
+            # Fermer l'ancien env
+            self.env.close()
+            # Créer le nouvel env
+            env_name = f'SuperMarioBros-{world}-{level}-v3'
+            new_env = gym_super_mario_bros.make(env_name)
+            self.env = JoypadSpace(new_env, SIMPLE_MOVEMENT)
+            print(f"✅ Env créé : {env_name}")
+
+            # Mettre à jour le niveau courant
+            self.current_world = world
+            self.current_level = level
+
+            # Charger la mémoire dédiée au nouveau niveau
+            self.segment_memory = MarioSegmentMemory(get_memory_path(world, level))
+            print(f"📚 Mémoire chargée : {self.segment_memory.furthest_x}px connue pour W{world}-{level}")
+
+            # Réinitialiser l'état par niveau (pas le score/coût de session)
+            self.rewind_buffer.clear()
+            self.rewind_count = 0
+            self.deaths_count = 0
+            self.lives_used = 0
+            self.stuck_counter = 0
+            self.last_stuck_check_step = 0
+            self.last_stuck_position = None
+            self.stuck_search_done = set()
+            self._blocked_macros_by_pos = {}
+            self.last_reflex_step = -25
+            self.last_hole_reflex_step = -60
+            self._hole_reflex_count = 0
+            self._hole_reflex_last_x = 0
+            self._run_phase = 1
+            self._phase3_ai_mode = False
+            self._segment_in_replay = False
+            self._last_known_solution_x = -999
+            self._unstick_start_x = None
+            self._unstick_sequence = None
+            self._raw_action_history = []
+            self._final_action_history = []
+            self._claude_generation += 1  # Invalider les threads en cours
+            self.claude_thinking = False
+            self.level_context_established = False
+            self.last_screenshot_step = -999
+            self.last_screenshot_x = 0
+            self.last_positions_update = 0
+            self._prev_score = 0
+            self._prev_coins = 0
+            self._prev_lives = 3
+            self._death_positions = []
+            self._danger_zone_x = None
+            self._rewind_correction_msg = None
+            self._rewind_active = False
+
+            # Logger la transition
+            self.logger.log_game_event("LEVEL_TRANSITION", step_count, {
+                "world": world, "level": level,
+                "env": env_name,
+                "memory_furthest_x": self.segment_memory.furthest_x
+            })
+            print(f"🚀 Transition complète → World {world}-{level} | mémoire: {self.segment_memory.furthest_x}px")
+            return True
+
+        except Exception as e:
+            print(f"❌ Erreur transition vers W{world}-{level}: {e}")
+            import traceback; traceback.print_exc()
+            return False
+
     def call_claude_stuck_mode(self, situation, position, failed_actions, obs, step_count, web_results=None):
         """Appel Claude spécial mode déblocage : contexte enrichi + résultats web."""
         failed_str = ', '.join(failed_actions) if failed_actions else 'inconnues'
@@ -2204,23 +2412,35 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
         _additions_str = ("\n⚙️  RÈGLES APPRIS DES SESSIONS PRÉCÉDENTES:\n" +
                           "\n".join(f"- {a}" for a in _additions) + "\n") if _additions else ""
 
-        prompt = f"""🚨 MARIO EST BLOQUÉ depuis plusieurs secondes!
+        # Identifier quels types de sauts ont déjà été essayés
+        _failed_set = set(failed_actions)
+        _jump_tried = [j for j in ['max_jump', 'pipe_jump', 'obstacle_jump', 'run_jump_over'] if j in _failed_set]
+        _jump_not_tried = [j for j in ['pipe_jump', 'obstacle_jump', 'max_jump'] if j not in _failed_set]
+        _jump_escalation = ""
+        if _jump_tried:
+            _jump_escalation = f"\n⚠️ SAUTS DÉJÀ ESSAYÉS SANS SUCCÈS: {', '.join(_jump_tried)}"
+            if _jump_not_tried:
+                _jump_escalation += f"\n→ ESSAIE MAINTENANT: {', '.join(_jump_not_tried)} (différent!)"
+            else:
+                _jump_escalation += "\n→ Tous les sauts simples échoués. Essaie step_back + élan + pipe_jump"
+
+        prompt = f"""🚨 MARIO EST BLOQUÉ depuis plusieurs secondes à la même position!
 
 Position Mario: x={position:.0f}px (World 1-1)
 Actions répétées sans succès: {failed_str}
 Progression: {situation.get('progress', {}).get('trend', 0):.1f}px/check
-{web_section}{_additions_str}
+{_jump_escalation}{web_section}{_additions_str}
 ANALYSE REQUISE:
 - Quel obstacle bloque Mario à cette position ?
-- Si c'est un TUYAU HAUT → utilise 'pipe_jump' (séquence automatique : approche 40f + saut max 40f)
-- Si c'est une PLATEFORME ÉLEVÉE → utilise 'obstacle_jump' (élan 20f + saut max 40f)
-- Autres options: hop_on_platform, approach_and_hit_block, step_back + pipe_jump
+- Si max_jump a échoué → c'est probablement un TUYAU HAUT → utilise 'pipe_jump' (séquence auto : approche 40f + saut max 40f)
+- Si max_jump+pipe_jump ont échoué → plateforme très élevée → utilise 'obstacle_jump' (élan 20f + saut max 40f)
+- Essaie aussi: step_back (reculer) pour prendre de l'élan, puis relancer un saut plus loin
 
-ACTIONS INTERDITES (déjà échouées): {failed_str}
+ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
 
-🎯 DONNE 3-4 ACTIONS DIFFÉRENTES pour débloquer Mario!
+🎯 DONNE 3-4 ACTIONS DIFFÉRENTES pour débloquer Mario (pas celles qui ont déjà échoué!)
 ⚠️ JSON UNIQUEMENT — ZÉRO TEXTE, ZÉRO EXPLICATION:
-{{"actions":[{{"macro_action":"run_forward","px":80}},{{"macro_action":"pipe_jump"}}],"urgency":9}}
+{{"actions":[{{"macro_action":"step_back"}},{{"macro_action":"pipe_jump"}}],"urgency":9}}
 (run_forward DOIT avoir px = pixels à parcourir)"""
 
         actions = self.parse_claude_actions(
@@ -2447,9 +2667,19 @@ ACTIONS INTERDITES (déjà échouées): {failed_str}
                 
             response = self.llm_responses[i]
             
-            # En-tête de la réponse
-            header_color = CYAN if response['type'] == 'SCREENSHOT' else GREEN
-            header_text = f"[{response['timestamp']}] {response['type']} (Step {response['step']})"
+            # En-tête de la réponse — couleur selon le type d'événement
+            _rtype = response['type']
+            if _rtype == 'APPEL':
+                header_color = (255, 180, 0)    # Bleu-cyan : call en cours
+            elif _rtype == 'ANNULE':
+                header_color = (100, 100, 100)  # Gris : annulé
+            elif _rtype == 'ACTIONS':
+                header_color = (0, 220, 0)      # Vert vif : réponse reçue
+            elif _rtype == 'SCREENSHOT':
+                header_color = CYAN
+            else:
+                header_color = GREEN
+            header_text = f"[{response['timestamp']}] {_rtype} step={response['step']}"
             cv2.putText(canvas, header_text, (x_start + 10, current_y), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, header_color, 1)
             current_y += line_height
@@ -3034,6 +3264,12 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             for change in changes:
                 prompt += f"\n• {change}"
 
+        # ⛔ Section macros bloquées
+        _pu_bucket = int(mario['x'] // 50) * 50
+        _pu_blocked = getattr(self, '_blocked_macros_by_pos', {}).get(_pu_bucket, set())
+        if _pu_blocked:
+            prompt += f"\n\n⛔ ACTIONS DÉJÀ ESSAYÉES SANS SUCCÈS à x≈{_pu_bucket}: {', '.join(sorted(_pu_blocked))}\n→ N'utilise PAS ces actions — elles ont déjà échoué!"
+
         # ⛰️ Section trou
         hole_info = positions_data.get('holes', {})
         if hole_info.get('detected'):
@@ -3333,10 +3569,12 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
     
     def _save_perfect_run(self):
         """Sauvegarde _final_action_history dans logs/perfect_run_{ts}.json.
-        C'est le run sans les segments ratés (tronqué aux checkpoints à chaque rewind)."""
+        C'est le run sans les segments ratés (tronqué aux checkpoints à chaque rewind).
+        Si un rewind a eu lieu, start_ram contient la RAM NES du checkpoint (base64)
+        pour que le replay reparte exactement de ce point avec le même timing ennemi."""
         if not self._final_action_history:
             return
-        import glob
+        import glob, base64
         logs_dir = os.path.join(os.path.dirname(__file__) or '.', 'logs')
         os.makedirs(logs_dir, exist_ok=True)
         # Garder seulement le dernier perfect_run (supprimer les anciens)
@@ -3344,16 +3582,23 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             os.remove(old)
         ts = int(time.time())
         path = os.path.join(logs_dir, f'perfect_run_{ts}.json')
+        data = {'actions': self._final_action_history,
+                'total': len(self._final_action_history)}
+        if self._perfect_start_ram is not None:
+            data['start_ram'] = base64.b64encode(self._perfect_start_ram.tobytes()).decode()
+            data['start_x'] = self._perfect_start_x
         with open(path, 'w') as f:
-            json.dump({'actions': self._final_action_history,
-                       'total': len(self._final_action_history)}, f)
-        print(f"💾 Run parfait sauvegardé : {len(self._final_action_history)} actions → {path}")
+            json.dump(data, f)
+        rewind_info = f" (depuis rewind x={self._perfect_start_x})" if self._perfect_start_ram is not None else ""
+        print(f"💾 Run parfait sauvegardé : {len(self._final_action_history)} actions{rewind_info} → {path}")
 
     def play_perfect_replay(self):
         """Rejoue _final_action_history à pleine vitesse, sans pause, sans Claude.
         Affiche les graphismes NES bruts avec couleurs corrigées (RGB→BGR).
+        Si un rewind avait eu lieu, restaure la RAM NES du checkpoint pour un timing
+        ennemi identique à la partie originale.
         Le replay s'arrête à la fin des actions ou si l'utilisateur appuie sur ESC."""
-        import glob
+        import glob, base64
         logs_dir = os.path.join(os.path.dirname(__file__) or '.', 'logs')
         # Chercher le dernier perfect_run sauvegardé
         files = sorted(glob.glob(os.path.join(logs_dir, 'perfect_run_*.json')))
@@ -3363,11 +3608,33 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         with open(files[-1]) as f:
             data = json.load(f)
         actions = data['actions']
+        has_start_ram = bool(data.get('start_ram'))
+        # Détecter les fichiers corrompus : pas de start_ram mais actions qui ne commencent
+        # pas par un départ normal (début du niveau = actions walk/run, pas jump x20+)
+        if not has_start_ram:
+            leading_jumps = sum(1 for a in actions[:40] if a == 4)
+            if leading_jumps >= 20:
+                print(f"⚠️  Ce replay a été généré avec une version incomplète du code.")
+                print(f"    Il contient {len(actions)} actions POST-rewind sans snapshot RAM.")
+                print(f"    Le replay sera incorrect (Mario commencera au mauvais endroit).")
+                print(f"    → Lancez une nouvelle partie et réessayez option 3.")
+                return
         print(f"▶️  Replay parfait : {len(actions)} actions (ESC pour arrêter)")
 
         env = gym_super_mario_bros.make('SuperMarioBros-1-1-v3')
         env = JoypadSpace(env, SIMPLE_MOVEMENT)
-        obs = env.reset()
+
+        # Si le run original avait un rewind, repartir depuis la RAM du checkpoint
+        if has_start_ram:
+            env.reset()  # Initialiser l'environnement NES
+            ram_bytes = base64.b64decode(data['start_ram'])
+            ram_array = np.frombuffer(ram_bytes, dtype=np.uint8).copy()
+            env.unwrapped.done = False
+            np.copyto(env.unwrapped._ram_buffer(), ram_array)
+            obs, _, _, _ = env.step(0)  # NOOP pour actualiser l'écran
+            print(f"⏪ Replay depuis checkpoint x={data.get('start_x', '?')} (timing ennemi identique)")
+        else:
+            obs = env.reset()
 
         cv2.namedWindow('Mario — Replay Parfait', cv2.WINDOW_AUTOSIZE)
         for i, action in enumerate(actions):
@@ -3835,16 +4102,18 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 
                         if stuck_level >= 2:
                             # Niveau 2 : recherche web + appel Claude déblocage
-                            # Exclure les primitives de base (walk/run/jump) de la liste "échouées"
-                            # pour que Claude puisse toujours les utiliser dans de nouvelles combinaisons
-                            _always_available = {'walk_right', 'run_forward', 'max_jump',
-                                                 'run_jump_over', 'pipe_jump', 'obstacle_jump'}
-                            failed = [m['name'] for m in list(self.macro_history)[-6:]
-                                      if m['name'] not in _always_available]
-                            web = self.search_mario_strategy(current_x, failed)
+                            # Passer TOUTES les macros récentes comme échouées (y compris sauts)
+                            # + macros mémorisées comme bloquées pour cette zone
+                            _bucket_l2 = int(current_x // 50) * 50
+                            _pos_blocked = self._blocked_macros_by_pos.get(_bucket_l2, set())
+                            _recent_failed = [m['name'] for m in list(self.macro_history)[-8:]]
+                            _all_failed = list(dict.fromkeys(_recent_failed + list(_pos_blocked)))  # dédupliqué
+                            web = self.search_mario_strategy(current_x, _all_failed)
                             sit = self.last_situation or {}
-                            self.call_claude_stuck_mode(sit, current_x, failed, obs, step_count, web)
+                            self.call_claude_stuck_mode(sit, current_x, _all_failed, obs, step_count, web)
                             self.stuck_counter = 0  # Réinitialiser après intervention
+                            # Cooldown : ne pas re-déclencher avant 150 steps
+                            self.last_stuck_check_step = step_count + 150
                             # Forcer cooldown réflexe pour laisser pipe_jump/obstacle_jump s'exécuter
                             self.last_reflex_step = step_count
                             # Mémoriser la tentative (séquence déterminée après succès)
@@ -3853,18 +4122,42 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                             self._unstick_step = step_count
                         elif stuck_level == 1:
                             # Niveau 1 : séquence de déblocage NES-validée
-                            # walk_right d'abord pour atteindre le pied de l'obstacle,
-                            # PUIS max_jump depuis le pied (physique NES confirmée)
-                            _unstick_seq = ['walk_right', 'max_jump', 'run_forward']
-                            print(f"🔁 Blocage léger: séquence {' → '.join(_unstick_seq)} (physique NES)")
+                            # Escalade automatique si max_jump déjà échoué à cette position
+                            _bucket_l1 = int(current_x // 50) * 50
+                            _blocked_l1 = self._blocked_macros_by_pos.get(_bucket_l1, set())
+                            # Détection auto de la hauteur de l'obstacle
+                            _obs_info = self.detect_obstacle_height(obs) if obs is not None else {'height_px': 0, 'jump_type': 'none'}
+                            _auto_jump = _obs_info.get('jump_type', 'none')
+                            _obs_h = _obs_info.get('height_px', 0)
+                            if _obs_h > 0:
+                                print(f"📏 Obstacle détecté: {_obs_h}px → saut recommandé: {_auto_jump}")
+                            if 'max_jump' in _blocked_l1 and 'pipe_jump' not in _blocked_l1:
+                                _jump_choice = 'pipe_jump'
+                                _reason = 'Escalade: max_jump échoué → pipe_jump (élan intégré)'
+                            elif 'max_jump' in _blocked_l1 and 'pipe_jump' in _blocked_l1:
+                                _jump_choice = 'obstacle_jump'
+                                _reason = 'Escalade: max_jump+pipe_jump échoués → obstacle_jump'
+                            elif _auto_jump != 'none' and _auto_jump not in _blocked_l1:
+                                # Auto-detect: utiliser le saut recommandé par l'analyse pixel
+                                _jump_choice = _auto_jump
+                                _reason = f'Auto-détect obstacle {_obs_h}px → {_auto_jump}'
+                            else:
+                                _jump_choice = 'max_jump'
+                                _reason = 'Déblocage NES: marcher jusqu\'au pied puis saut maximum'
+                            _unstick_seq = ['walk_right', _jump_choice, 'run_forward']
+                            print(f"🔁 Blocage léger: séquence {' → '.join(_unstick_seq)} (bloqués: {_blocked_l1 or 'aucun'})")
                             self.action_queue.clear()
                             self.current_macro = None
                             for alt in _unstick_seq:
                                 self.action_queue.append({
                                     'macro_name': alt,
-                                    'reasoning': 'Déblocage NES: marcher jusqu\'au pied puis saut maximum',
+                                    'reasoning': _reason,
                                     'strategy': 'Anti-blocage mur', 'urgency': 7, 'confidence': 85
                                 })
+                            # Cooldown après injection : ne pas re-déclencher avant 150 steps
+                            # (pipe_jump = 80f, obstacle_jump = 60f → 150 steps est suffisant)
+                            self.last_stuck_check_step = step_count + 150
+                            self.stuck_counter = 0
                             # Mémoriser la tentative de déblocage
                             self._unstick_start_x = current_x
                             self._unstick_sequence = _unstick_seq
@@ -3960,18 +4253,17 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         flag_get = real_info.get('flag_get', False)
                         
                         if flag_get:
-                            print("🎉 VICTOIRE! Mario a terminé le niveau!")
+                            print(f"🎉 VICTOIRE! Mario a terminé World {self.current_world}-{self.current_level}!")
                             last_mario_decision = {'reasoning': 'VICTOIRE! Niveau terminé!', 'strategy': 'Mission accomplie'}
-                            
+
                             # Logger la victoire
                             self.logger.log_game_event("VICTORY", step_count, {
-                                "final_score": total_reward,
-                                "steps_taken": step_count,
-                                "api_calls": self.api_calls,
-                                "total_cost": self.total_cost
+                                "world": self.current_world, "level": self.current_level,
+                                "final_score": total_reward, "steps_taken": step_count,
+                                "api_calls": self.api_calls, "total_cost": self.total_cost
                             })
-                            
-                            # Terminer le run avec victoire
+
+                            # Finaliser la mémoire du niveau terminé
                             self.segment_memory.finalize_stage(_run_max_x, step_count, died=False)
                             if self.current_run_started:
                                 summary = self.history_manager.end_run("victory", total_reward)
@@ -3979,8 +4271,34 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     self.history_manager.print_run_summary(summary)
 
                             time.sleep(3)  # Pause pour admirer la victoire
-                            self._exit_reason = "victory"
-                            break
+
+                            # Passer au niveau suivant
+                            next_lvl = get_next_level(self.current_world, self.current_level)
+                            if next_lvl is None:
+                                print("🏆 JEU TERMINÉ ! Mario a battu tous les niveaux !")
+                                self._exit_reason = "game_complete"
+                                break
+
+                            next_world, next_level = next_lvl
+                            print(f"➡️  Transition vers World {next_world}-{next_level}...")
+                            transitioned = self._transition_to_level(next_world, next_level, step_count)
+                            if not transitioned:
+                                self._exit_reason = "victory"
+                                break
+                            # Réinitialiser les variables locales de boucle pour le nouveau niveau
+                            obs = self.env.reset()
+                            step_count = 0
+                            total_reward = 0.0
+                            _run_max_x = 0
+                            done = False
+                            current_action = None
+                            current_macro_name = None
+                            self.current_macro = None
+                            self.action_queue.clear()
+                            self.last_situation = None
+                            # Forcer un premier appel Claude pour le nouveau niveau
+                            self.level_context_established = False
+                            continue
                         else:
                             # Mario est mort - mettre à jour le compteur interne
                             self.mario_lives_remaining = mario_lives_env
@@ -4044,9 +4362,11 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 # Le PPU VRAM du jeu courant est préservé → collision correcte.
                                 checkpoint_ram = checkpoint.get('ram')
                                 self._raw_action_history.clear()
-                                # Historique "propre" : on revient à l'état du checkpoint
-                                # (supprime les actions du segment raté)
-                                self._final_action_history = list(checkpoint.get('action_history', []))
+                                # Historique "propre" pour replay parfait :
+                                # On VIDE complètement _final_action_history et on repart de zéro
+                                # depuis le checkpoint. Le replay démarrera depuis le snapshot RAM
+                                # → pas de problème de timing ennemi (pas de pré-rewind à rejouer).
+                                self._final_action_history = []
                                 _last_replay_info = {}
                                 if checkpoint_ram is not None:
                                     # 1. Débloquer env.step() sans toucher au PPU
@@ -4055,6 +4375,11 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     np.copyto(self.env.unwrapped._ram_buffer(), checkpoint_ram)
                                     # 3. NOOP pour rafraîchir l'écran et récupérer les infos
                                     obs, _, _, _last_replay_info = self.env.step(0)
+                                    # 4. Sauvegarder ce snapshot RAM pour le replay parfait.
+                                    #    Le replay repartira exactement de ce point (pas de
+                                    #    reconstitution partielle → timing ennemi identique).
+                                    self._perfect_start_ram = checkpoint_ram.copy()
+                                    self._perfect_start_x = checkpoint['x_pos']
                                     print(f"⏪ RAM restaurée (PPU intact) → x={checkpoint['x_pos']} "
                                           f"(step={checkpoint['step']})")
                                 else:
