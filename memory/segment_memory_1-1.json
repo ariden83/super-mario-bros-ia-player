@@ -1,6 +1,6 @@
 {
   "furthest_x": 3161,
-  "total_runs": 149,
+  "total_runs": 155,
   "stage": {
     "safe_max_x": 3161,
     "total_blocks": 4,
@@ -210,7 +210,7 @@
       "segment_key": "0-100",
       "start_x": 0,
       "end_x": 100,
-      "passages_count": 144,
+      "passages_count": 193,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -220,7 +220,7 @@
       "segment_key": "100-200",
       "start_x": 100,
       "end_x": 200,
-      "passages_count": 144,
+      "passages_count": 193,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -242,7 +242,7 @@
       "segment_key": "200-300",
       "start_x": 200,
       "end_x": 300,
-      "passages_count": 143,
+      "passages_count": 191,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
@@ -413,6 +413,24 @@
           "interaction_type": "item_collected",
           "detail": "coin",
           "points": 200
+        },
+        {
+          "x": 254,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 254,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 249,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
         }
       ],
       "successes": [
@@ -447,6 +465,17 @@
           ],
           "steps_to_clear": 14,
           "count": 3
+        },
+        {
+          "x": 202,
+          "winning_sequence": [
+            "run_jump_over",
+            "run_forward",
+            "run_forward",
+            "run_jump_over"
+          ],
+          "steps_to_clear": 13,
+          "count": 1
         }
       ]
     },
@@ -454,7 +483,7 @@
       "segment_key": "300-400",
       "start_x": 300,
       "end_x": 400,
-      "passages_count": 129,
+      "passages_count": 176,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
@@ -535,6 +564,12 @@
           "interaction_type": "item_collected",
           "detail": "coin",
           "points": 200
+        },
+        {
+          "x": 374,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
         }
       ],
       "successes": [
@@ -555,10 +590,17 @@
       "segment_key": "400-500",
       "start_x": 400,
       "end_x": 500,
-      "passages_count": 83,
+      "passages_count": 130,
       "approach_death_count": 0,
       "deaths": [],
-      "interactions": [],
+      "interactions": [
+        {
+          "x": 434,
+          "interaction_type": "item_collected",
+          "detail": "item",
+          "points": 1000
+        }
+      ],
       "successes": [
         {
           "x": 496,
@@ -588,7 +630,7 @@
             "run_forward"
           ],
           "steps_to_clear": 27,
-          "count": 8
+          "count": 9
         },
         {
           "x": 436,
@@ -611,6 +653,104 @@
           ],
           "steps_to_clear": 31,
           "count": 1
+        },
+        {
+          "x": 437,
+          "winning_sequence": [
+            "walk_right",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 30,
+          "count": 3
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 71,
+          "count": 6
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 84,
+          "count": 22
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "obstacle_jump",
+            "max_jump"
+          ],
+          "steps_to_clear": 69,
+          "count": 1
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 70,
+          "count": 1
+        },
+        {
+          "x": 441,
+          "winning_sequence": [
+            "run_jump_over",
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 31,
+          "count": 1
+        },
+        {
+          "x": 439,
+          "winning_sequence": [
+            "run_forward",
+            "max_jump",
+            "step_back",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 34,
+          "count": 1
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "run_jump_over",
+            "step_back",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 72,
+          "count": 1
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 72,
+          "count": 6
         }
       ]
     },
@@ -618,7 +758,7 @@
       "segment_key": "500-600",
       "start_x": 500,
       "end_x": 600,
-      "passages_count": 81,
+      "passages_count": 121,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -672,7 +812,94 @@
             "max_jump",
             "run_forward"
           ],
-          "steps_to_clear": 21,
+          "steps_to_clear": 14,
+          "count": 2
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "walk_right",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 83,
+          "count": 4
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "obstacle_jump",
+            "max_jump"
+          ],
+          "steps_to_clear": 72,
+          "count": 21
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "step_back",
+            "pipe_jump",
+            "run_forward",
+            "stomp_enemy"
+          ],
+          "steps_to_clear": 96,
+          "count": 1
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "pipe_jump",
+            "max_jump"
+          ],
+          "steps_to_clear": 88,
+          "count": 1
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 78,
+          "count": 1
+        },
+        {
+          "x": 599,
+          "winning_sequence": [
+            "max_jump",
+            "run_forward",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 26,
+          "count": 1
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "step_back",
+            "pipe_jump",
+            "run_forward",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 84,
+          "count": 1
+        },
+        {
+          "x": 594,
+          "winning_sequence": [
+            "step_back",
+            "pipe_jump",
+            "obstacle_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 96,
           "count": 1
         }
       ]
@@ -681,7 +908,7 @@
       "segment_key": "600-700",
       "start_x": 600,
       "end_x": 700,
-      "passages_count": 77,
+      "passages_count": 117,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -712,7 +939,7 @@
       "segment_key": "700-800",
       "start_x": 700,
       "end_x": 800,
-      "passages_count": 59,
+      "passages_count": 90,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -759,6 +986,116 @@
           ],
           "steps_to_clear": 130,
           "count": 2
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "step_back",
+            "pipe_jump",
+            "run_forward",
+            "stomp_enemy"
+          ],
+          "steps_to_clear": 103,
+          "count": 2
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "pipe_jump",
+            "run_forward",
+            "stomp_enemy",
+            "stomp_enemy"
+          ],
+          "steps_to_clear": 106,
+          "count": 8
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "step_back",
+            "stomp_enemy",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 98,
+          "count": 6
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 97,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "run_jump_over",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 103,
+          "count": 2
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 73,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "step_back",
+            "run_forward",
+            "pipe_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 119,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "obstacle_jump",
+            "step_back",
+            "pipe_jump",
+            "run_jump_over"
+          ],
+          "steps_to_clear": 95,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "run_jump_over",
+            "step_back",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 77,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "pipe_jump",
+            "run_jump_over",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 33,
+          "count": 1
         }
       ]
     },
@@ -766,7 +1103,7 @@
       "segment_key": "800-900",
       "start_x": 800,
       "end_x": 900,
-      "passages_count": 31,
+      "passages_count": 55,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -790,6 +1127,126 @@
           ],
           "steps_to_clear": 13,
           "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "walk_right",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 92,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 102,
+          "count": 12
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "max_jump",
+            "step_back",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 80,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "run_forward",
+            "max_jump",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 96,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "max_jump",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 103,
+          "count": 3
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 79,
+          "count": 2
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 97,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "run_jump_over",
+            "run_jump_over",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 75,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "pipe_jump",
+            "max_jump",
+            "obstacle_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 114,
+          "count": 1
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "step_back",
+            "run_forward",
+            "obstacle_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 129,
+          "count": 1
+        },
+        {
+          "x": 899,
+          "winning_sequence": [
+            "run_jump_over",
+            "pipe_jump",
+            "step_back",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 42,
+          "count": 2
         }
       ]
     },
@@ -797,7 +1254,7 @@
       "segment_key": "900-1000",
       "start_x": 900,
       "end_x": 1000,
-      "passages_count": 21,
+      "passages_count": 43,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -811,6 +1268,17 @@
           ],
           "steps_to_clear": 25,
           "count": 2
+        },
+        {
+          "x": 900,
+          "winning_sequence": [
+            "run_jump_over",
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 42,
+          "count": 1
         }
       ]
     },
@@ -818,7 +1286,7 @@
       "segment_key": "1000-1100",
       "start_x": 1000,
       "end_x": 1100,
-      "passages_count": 20,
+      "passages_count": 29,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -828,7 +1296,7 @@
       "segment_key": "1100-1200",
       "start_x": 1100,
       "end_x": 1200,
-      "passages_count": 20,
+      "passages_count": 29,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -838,7 +1306,7 @@
       "segment_key": "1200-1300",
       "start_x": 1200,
       "end_x": 1300,
-      "passages_count": 7,
+      "passages_count": 14,
       "approach_death_count": 2,
       "deaths": [],
       "interactions": [],
@@ -848,7 +1316,7 @@
       "segment_key": "1300-1400",
       "start_x": 1300,
       "end_x": 1400,
-      "passages_count": 7,
+      "passages_count": 14,
       "approach_death_count": 8,
       "deaths": [],
       "interactions": [],
@@ -858,7 +1326,7 @@
       "segment_key": "1400-1500",
       "start_x": 1400,
       "end_x": 1500,
-      "passages_count": 7,
+      "passages_count": 14,
       "approach_death_count": 7,
       "deaths": [
         {
@@ -898,13 +1366,36 @@
           "points": 200
         }
       ],
-      "successes": []
+      "successes": [
+        {
+          "x": 1477,
+          "winning_sequence": [
+            "run_forward",
+            "max_jump",
+            "step_back",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 14,
+          "count": 1
+        },
+        {
+          "x": 1494,
+          "winning_sequence": [
+            "max_jump",
+            "max_jump",
+            "run_forward",
+            "stomp_enemy"
+          ],
+          "steps_to_clear": 13,
+          "count": 1
+        }
+      ]
     },
     "1500-1600": {
       "segment_key": "1500-1600",
       "start_x": 1500,
       "end_x": 1600,
-      "passages_count": 4,
+      "passages_count": 9,
       "approach_death_count": 1,
       "deaths": [
         {
@@ -962,7 +1453,7 @@
       "segment_key": "1600-1700",
       "start_x": 1600,
       "end_x": 1700,
-      "passages_count": 3,
+      "passages_count": 8,
       "approach_death_count": 0,
       "deaths": [
         {
@@ -984,12 +1475,30 @@
       "segment_key": "1700-1800",
       "start_x": 1700,
       "end_x": 1800,
-      "passages_count": 3,
+      "passages_count": 6,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
         {
           "x": 1797,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 1783,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 1789,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 1790,
           "interaction_type": "item_collected",
           "detail": "coin",
           "points": 200
@@ -1001,7 +1510,7 @@
       "segment_key": "1800-1900",
       "start_x": 1800,
       "end_x": 1900,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1011,7 +1520,7 @@
       "segment_key": "1900-2000",
       "start_x": 1900,
       "end_x": 2000,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1021,7 +1530,7 @@
       "segment_key": "2000-2100",
       "start_x": 2000,
       "end_x": 2100,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1031,7 +1540,7 @@
       "segment_key": "2100-2200",
       "start_x": 2100,
       "end_x": 2200,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1055,6 +1564,17 @@
           ],
           "steps_to_clear": 76,
           "count": 1
+        },
+        {
+          "x": 2178,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 88,
+          "count": 2
         }
       ]
     },
@@ -1062,7 +1582,7 @@
       "segment_key": "2200-2300",
       "start_x": 2200,
       "end_x": 2300,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 5,
       "deaths": [],
       "interactions": [],
@@ -1076,6 +1596,28 @@
           ],
           "steps_to_clear": 69,
           "count": 1
+        },
+        {
+          "x": 2226,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "obstacle_jump",
+            "max_jump"
+          ],
+          "steps_to_clear": 75,
+          "count": 2
+        },
+        {
+          "x": 2231,
+          "winning_sequence": [
+            "pipe_jump",
+            "step_back",
+            "obstacle_jump",
+            "max_jump"
+          ],
+          "steps_to_clear": 42,
+          "count": 1
         }
       ]
     },
@@ -1083,17 +1625,40 @@
       "segment_key": "2300-2400",
       "start_x": 2300,
       "end_x": 2400,
-      "passages_count": 2,
+      "passages_count": 5,
       "approach_death_count": 5,
       "deaths": [],
       "interactions": [],
-      "successes": []
+      "successes": [
+        {
+          "x": 2354,
+          "winning_sequence": [
+            "run_forward",
+            "step_back",
+            "pipe_jump",
+            "run_forward"
+          ],
+          "steps_to_clear": 88,
+          "count": 2
+        },
+        {
+          "x": 2386,
+          "winning_sequence": [
+            "max_jump",
+            "max_jump",
+            "step_back",
+            "max_jump"
+          ],
+          "steps_to_clear": 35,
+          "count": 1
+        }
+      ]
     },
     "2400-2500": {
       "segment_key": "2400-2500",
       "start_x": 2400,
       "end_x": 2500,
-      "passages_count": 2,
+      "passages_count": 4,
       "approach_death_count": 0,
       "deaths": [
         {
@@ -1126,7 +1691,7 @@
       "segment_key": "2500-2600",
       "start_x": 2500,
       "end_x": 2600,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1136,7 +1701,7 @@
       "segment_key": "2600-2700",
       "start_x": 2600,
       "end_x": 2700,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1146,7 +1711,7 @@
       "segment_key": "2700-2800",
       "start_x": 2700,
       "end_x": 2800,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1156,7 +1721,7 @@
       "segment_key": "2800-2900",
       "start_x": 2800,
       "end_x": 2900,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1166,7 +1731,7 @@
       "segment_key": "2900-3000",
       "start_x": 2900,
       "end_x": 3000,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1176,7 +1741,7 @@
       "segment_key": "3000-3100",
       "start_x": 3000,
       "end_x": 3100,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1186,7 +1751,7 @@
       "segment_key": "3100-3200",
       "start_x": 3100,
       "end_x": 3200,
-      "passages_count": 1,
+      "passages_count": 2,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],

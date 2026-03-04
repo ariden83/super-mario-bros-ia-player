@@ -250,7 +250,7 @@ Règles importantes :
             return []
 
         if not os.path.exists(GAME_FILE):
-            print(f"❌ Fichier {GAME_FILE} introuvable")
+            print(f" Fichier {GAME_FILE} introuvable")
             return []
 
         with open(GAME_FILE, "r", encoding="utf-8") as f:
@@ -266,21 +266,21 @@ Règles importantes :
             risk = patch.get("risque", "?")
 
             if not search or not replace:
-                print(f"  ⚠️  Patch incomplet ignoré: {desc}")
+                print(f"    Patch incomplet ignoré: {desc}")
                 continue
 
             if search == replace:
-                print(f"  ⚠️  Patch no-op ignoré: {desc}")
+                print(f"    Patch no-op ignoré: {desc}")
                 continue
 
             if search not in modified:
-                print(f"  ⚠️  Texte non trouvé, patch ignoré: {desc}")
+                print(f"    Texte non trouvé, patch ignoré: {desc}")
                 print(f"       Cherché: {repr(search[:80])}")
                 continue
 
             count = modified.count(search)
             if count > 1:
-                print(f"  ⚠️  Texte ambigu ({count} occurrences), patch ignoré: {desc}")
+                print(f"    Texte ambigu ({count} occurrences), patch ignoré: {desc}")
                 continue
 
             modified = modified.replace(search, replace, 1)
@@ -290,14 +290,14 @@ Règles importantes :
                 "search_preview": search[:100].replace("\n", "↵"),
                 "replace_preview": replace[:100].replace("\n", "↵"),
             })
-            print(f"  ✅ Patch appliqué [{risk}]: {desc}")
+            print(f"   Patch appliqué [{risk}]: {desc}")
 
         if applied:
             backup_path = _backup(GAME_FILE)
-            print(f"  💾 Backup: {backup_path}")
+            print(f"   Backup: {backup_path}")
             with open(GAME_FILE, "w", encoding="utf-8") as f:
                 f.write(modified)
-            print(f"  📝 {GAME_FILE} mis à jour ({len(applied)} patch(es))")
+            print(f"   {GAME_FILE} mis à jour ({len(applied)} patch(es))")
 
         return applied
 
@@ -328,22 +328,22 @@ Règles importantes :
         if session_id is None:
             session_id = self.get_latest_session_id()
         if session_id is None:
-            print("⚠️  Aucune session à analyser.")
+            print("  Aucune session à analyser.")
             return False
 
         print(f"\n{'='*60}")
-        print(f"🔬 AUTO-AMÉLIORATION — session {session_id[-8:]}")
+        print(f" AUTO-AMÉLIORATION — session {session_id[-8:]}")
         print(f"{'='*60}")
 
         # 1. Charger les données
-        print("📂 Lecture des logs...")
+        print(" Lecture des logs...")
         session_data = self.load_session_data(session_id)
-        print("📖 Lecture du code source...")
+        print(" Lecture du code source...")
         code_sections = self._read_code_sections()
 
         # 2. Appeler Claude Sonnet
         prompt = self._build_prompt(session_data, code_sections)
-        print("🧠 Appel Claude Sonnet pour analyse...")
+        print(" Appel Claude Sonnet pour analyse...")
         try:
             response = self.client.messages.create(
                 model="claude-sonnet-4-6",
@@ -353,9 +353,9 @@ Règles importantes :
             raw = response.content[0].text.strip()
             cost = (response.usage.input_tokens * 0.000003 +
                     response.usage.output_tokens * 0.000015)
-            print(f"   💰 Coût analyse: ${cost:.4f}")
+            print(f"    Coût analyse: ${cost:.4f}")
         except Exception as e:
-            print(f"❌ Erreur API Claude: {e}")
+            print(f" Erreur API Claude: {e}")
             return False
 
         # 3. Parser le JSON
@@ -366,31 +366,31 @@ Règles importantes :
                 raise ValueError("Pas de JSON dans la réponse")
             report = json.loads(raw[start:end])
         except Exception as e:
-            print(f"❌ Réponse Claude non parseable: {e}")
+            print(f" Réponse Claude non parseable: {e}")
             print(f"   Réponse brute:\n{raw[:500]}")
             return False
 
         # 4. Afficher l'analyse
-        print(f"\n📋 Analyse : {report.get('analyse', '(vide)')}")
-        print(f"🔎 Cause   : {report.get('cause_racine', '(vide)')}")
+        print(f"\n Analyse : {report.get('analyse', '(vide)')}")
+        print(f" Cause   : {report.get('cause_racine', '(vide)')}")
 
         patches = report.get("patches", [])
         if not patches:
-            print("ℹ️  Aucun patch suggéré — comportement correct pour cette session.")
+            print("ℹ  Aucun patch suggéré — comportement correct pour cette session.")
             self._save_history(session_id, report, [])
             return False
 
-        print(f"\n🔧 {len(patches)} patch(es) proposé(s) :")
+        print(f"\n {len(patches)} patch(es) proposé(s) :")
         for i, p in enumerate(patches, 1):
             print(f"  {i}. [{p.get('risque','?')}] {p.get('description','?')}")
 
         # 5. Appliquer les patches
-        print(f"\n⚙️  Application des patches sur {GAME_FILE}...")
+        print(f"\n  Application des patches sur {GAME_FILE}...")
         applied = self._apply_patches(patches)
 
         # 6. Sauvegarder l'historique
         self._save_history(session_id, report, applied)
 
-        print(f"\n✨ Amélioration attendue : {report.get('amelioration_attendue','?')}")
+        print(f"\n Amélioration attendue : {report.get('amelioration_attendue','?')}")
         print(f"{'='*60}")
         return len(applied) > 0

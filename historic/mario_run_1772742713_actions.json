@@ -1,0 +1,1532 @@
+[
+  {
+    "timestamp": 0.9381945133209229,
+    "step_count": 0,
+    "position_x": 0,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 0
+  },
+  {
+    "timestamp": 6.226695775985718,
+    "step_count": 56,
+    "position_x": 100,
+    "position_y": 200,
+    "action_name": "run_forward(85px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 58.0
+  },
+  {
+    "timestamp": 8.06209397315979,
+    "step_count": 56,
+    "position_x": 100,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 58.0
+  },
+  {
+    "timestamp": 11.590060710906982,
+    "step_count": 56,
+    "position_x": 100,
+    "position_y": 200,
+    "action_name": "pipe_jump(80px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 58.0
+  },
+  {
+    "timestamp": 15.286270141601562,
+    "step_count": 56,
+    "position_x": 100,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 58.0
+  },
+  {
+    "timestamp": 18.077758073806763,
+    "step_count": 56,
+    "position_x": 100,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 58.0
+  },
+  {
+    "timestamp": 21.769847631454468,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 24.522716283798218,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 26.63407588005066,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 29.337762117385864,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 32.458632469177246,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 34.87047052383423,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 35.67443084716797,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 36.346694469451904,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 37.57010817527771,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 38.33852577209473,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 39.364561796188354,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 40.082722902297974,
+    "step_count": 295,
+    "position_x": 434,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 382.0
+  },
+  {
+    "timestamp": 44.91197967529297,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_forward(140px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 47.913185119628906,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 50.796653032302856,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "step_back[6f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 51.06098461151123,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 54.082274198532104,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 57.23044967651367,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 59.66471481323242,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 60.306682109832764,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 61.06658911705017,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 61.99330997467041,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 62.813201665878296,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 63.664156913757324,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 64.54858922958374,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 67.80039978027344,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 71.58712267875671,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 75.26029849052429,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 78.3648133277893,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 79.14859652519226,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 80.21924185752869,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 80.93025469779968,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 81.60192775726318,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 82.53529405593872,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 83.27873611450195,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 86.30037903785706,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 90.06233310699463,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 92.96072387695312,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 95.04856729507446,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 97.21088981628418,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 98.82258868217468,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 101.9959397315979,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 104.53420448303223,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 106.45825219154358,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 107.95217156410217,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 111.03438782691956,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 113.46019744873047,
+    "step_count": 530,
+    "position_x": 701,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 623.0
+  },
+  {
+    "timestamp": 114.89092302322388,
+    "step_count": 1298,
+    "position_x": 1673,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1704.0
+  },
+  {
+    "timestamp": 116.82201528549194,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 118.29616498947144,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 121.47858357429504,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 123.65028977394104,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 126.19593477249146,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 296.44254541397095,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 301.70413064956665,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 302.30217242240906,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 306.830952167511,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 309.2227656841278,
+    "step_count": 1316,
+    "position_x": 1387,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 1742.0
+  },
+  {
+    "timestamp": 313.36082911491394,
+    "step_count": 1730,
+    "position_x": 2130,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2468.0
+  },
+  {
+    "timestamp": 317.1025757789612,
+    "step_count": 1786,
+    "position_x": 2154,
+    "position_y": 200,
+    "action_name": "run_forward(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2489.0
+  },
+  {
+    "timestamp": 318.13855957984924,
+    "step_count": 1794,
+    "position_x": 2162,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2497.0
+  },
+  {
+    "timestamp": 321.74196457862854,
+    "step_count": 1850,
+    "position_x": 2187,
+    "position_y": 200,
+    "action_name": "run_forward(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2520.0
+  },
+  {
+    "timestamp": 322.94917249679565,
+    "step_count": 1858,
+    "position_x": 2199,
+    "position_y": 200,
+    "action_name": "run_forward(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2531.0
+  },
+  {
+    "timestamp": 323.86074233055115,
+    "step_count": 1866,
+    "position_x": 2213,
+    "position_y": 200,
+    "action_name": "run_forward(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2545.0
+  },
+  {
+    "timestamp": 324.5962495803833,
+    "step_count": 1874,
+    "position_x": 2227,
+    "position_y": 200,
+    "action_name": "pipe_jump(80px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2559.0
+  },
+  {
+    "timestamp": 329.212126493454,
+    "step_count": 1874,
+    "position_x": 2227,
+    "position_y": 200,
+    "action_name": "step_back[6f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2559.0
+  },
+  {
+    "timestamp": 329.47027111053467,
+    "step_count": 1874,
+    "position_x": 2227,
+    "position_y": 200,
+    "action_name": "obstacle_jump[20f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2559.0
+  },
+  {
+    "timestamp": 331.63411831855774,
+    "step_count": 1874,
+    "position_x": 2227,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2559.0
+  },
+  {
+    "timestamp": 332.374568939209,
+    "step_count": 1992,
+    "position_x": 2262,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2589.0
+  },
+  {
+    "timestamp": 333.32633543014526,
+    "step_count": 1994,
+    "position_x": 2265,
+    "position_y": 200,
+    "action_name": "obstacle_jump(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2592.0
+  },
+  {
+    "timestamp": 334.2870602607727,
+    "step_count": 2003,
+    "position_x": 2279,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2605.0
+  },
+  {
+    "timestamp": 334.91888880729675,
+    "step_count": 2005,
+    "position_x": 2282,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2608.0
+  },
+  {
+    "timestamp": 337.80049228668213,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 340.5006363391876,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump(15px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 342.54533433914185,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 346.18609261512756,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 348.29274892807007,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 351.0301446914673,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 353.6780517101288,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 355.15376710891724,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 356.29127740859985,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 356.96633887290955,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 357.5789592266083,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 358.2967212200165,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 358.9125699996948,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 359.95186829566956,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 360.54711961746216,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 361.263952255249,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 361.9791271686554,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 362.62194418907166,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 363.31445145606995,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 363.94686675071716,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 364.6458785533905,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 365.2909026145935,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 367.23017024993896,
+    "step_count": 2047,
+    "position_x": 2352,
+    "position_y": 200,
+    "action_name": "max_jump[40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2676.0
+  },
+  {
+    "timestamp": 370.2788496017456,
+    "step_count": 2378,
+    "position_x": 2594,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2905.0
+  },
+  {
+    "timestamp": 374.46516847610474,
+    "step_count": 2434,
+    "position_x": 2614,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2922.0
+  },
+  {
+    "timestamp": 378.64212250709534,
+    "step_count": 2434,
+    "position_x": 2614,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 2922.0
+  },
+  {
+    "timestamp": 379.85686922073364,
+    "step_count": 2500,
+    "position_x": 2761,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3049.0
+  },
+  {
+    "timestamp": 383.798814535141,
+    "step_count": 2556,
+    "position_x": 2619,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3072.0
+  },
+  {
+    "timestamp": 386.8485550880432,
+    "step_count": 2556,
+    "position_x": 2619,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3072.0
+  },
+  {
+    "timestamp": 389.86477541923523,
+    "step_count": 2556,
+    "position_x": 2619,
+    "position_y": 200,
+    "action_name": "run_jump_over[50f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3072.0
+  },
+  {
+    "timestamp": 393.714204788208,
+    "step_count": 2705,
+    "position_x": 2914,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3360.0
+  },
+  {
+    "timestamp": 397.42258524894714,
+    "step_count": 2761,
+    "position_x": 2950,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3394.0
+  },
+  {
+    "timestamp": 399.77412152290344,
+    "step_count": 2785,
+    "position_x": 2964,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3407.0
+  },
+  {
+    "timestamp": 400.5868902206421,
+    "step_count": 2787,
+    "position_x": 2965,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3408.0
+  },
+  {
+    "timestamp": 401.37001276016235,
+    "step_count": 2789,
+    "position_x": 2966,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3409.0
+  },
+  {
+    "timestamp": 402.1024560928345,
+    "step_count": 2791,
+    "position_x": 2967,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3410.0
+  },
+  {
+    "timestamp": 403.0121295452118,
+    "step_count": 2793,
+    "position_x": 2969,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3412.0
+  },
+  {
+    "timestamp": 403.74629378318787,
+    "step_count": 2795,
+    "position_x": 2970,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3413.0
+  },
+  {
+    "timestamp": 404.67861795425415,
+    "step_count": 2797,
+    "position_x": 2972,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3414.0
+  },
+  {
+    "timestamp": 405.6302390098572,
+    "step_count": 2799,
+    "position_x": 2974,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3416.0
+  },
+  {
+    "timestamp": 406.4065580368042,
+    "step_count": 2801,
+    "position_x": 2976,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3418.0
+  },
+  {
+    "timestamp": 408.8785729408264,
+    "step_count": 2821,
+    "position_x": 2979,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3420.0
+  },
+  {
+    "timestamp": 409.77429938316345,
+    "step_count": 2823,
+    "position_x": 2979,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3420.0
+  },
+  {
+    "timestamp": 410.6062436103821,
+    "step_count": 2825,
+    "position_x": 2980,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3421.0
+  },
+  {
+    "timestamp": 411.33470940589905,
+    "step_count": 2827,
+    "position_x": 2981,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3422.0
+  },
+  {
+    "timestamp": 412.03094005584717,
+    "step_count": 2829,
+    "position_x": 2982,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3423.0
+  },
+  {
+    "timestamp": 412.8487551212311,
+    "step_count": 2831,
+    "position_x": 2983,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3424.0
+  },
+  {
+    "timestamp": 413.5941834449768,
+    "step_count": 2833,
+    "position_x": 2984,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3425.0
+  },
+  {
+    "timestamp": 414.2940435409546,
+    "step_count": 2835,
+    "position_x": 2986,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3427.0
+  },
+  {
+    "timestamp": 414.994047164917,
+    "step_count": 2837,
+    "position_x": 2987,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3428.0
+  },
+  {
+    "timestamp": 415.74244499206543,
+    "step_count": 2839,
+    "position_x": 2989,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3430.0
+  },
+  {
+    "timestamp": 416.83457922935486,
+    "step_count": 2841,
+    "position_x": 2991,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3432.0
+  },
+  {
+    "timestamp": 417.5867569446564,
+    "step_count": 2843,
+    "position_x": 2993,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3434.0
+  },
+  {
+    "timestamp": 418.40797114372253,
+    "step_count": 2845,
+    "position_x": 2995,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3435.0
+  },
+  {
+    "timestamp": 419.2304720878601,
+    "step_count": 2847,
+    "position_x": 2998,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3438.0
+  },
+  {
+    "timestamp": 420.0067503452301,
+    "step_count": 2849,
+    "position_x": 3000,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3440.0
+  },
+  {
+    "timestamp": 420.83414459228516,
+    "step_count": 2851,
+    "position_x": 3003,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3443.0
+  },
+  {
+    "timestamp": 421.5788736343384,
+    "step_count": 2853,
+    "position_x": 3006,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3446.0
+  },
+  {
+    "timestamp": 422.40011525154114,
+    "step_count": 2855,
+    "position_x": 3009,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3449.0
+  },
+  {
+    "timestamp": 423.11802077293396,
+    "step_count": 2857,
+    "position_x": 3012,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3452.0
+  },
+  {
+    "timestamp": 424.0379445552826,
+    "step_count": 2859,
+    "position_x": 3015,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3455.0
+  },
+  {
+    "timestamp": 424.86633372306824,
+    "step_count": 2861,
+    "position_x": 3018,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3458.0
+  },
+  {
+    "timestamp": 425.6441271305084,
+    "step_count": 2863,
+    "position_x": 3021,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3461.0
+  },
+  {
+    "timestamp": 426.3825387954712,
+    "step_count": 2865,
+    "position_x": 3024,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3464.0
+  },
+  {
+    "timestamp": 427.0779182910919,
+    "step_count": 2867,
+    "position_x": 3027,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3467.0
+  },
+  {
+    "timestamp": 427.81262707710266,
+    "step_count": 2869,
+    "position_x": 3030,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3469.0
+  },
+  {
+    "timestamp": 428.63872623443604,
+    "step_count": 2871,
+    "position_x": 3033,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3472.0
+  },
+  {
+    "timestamp": 429.462215423584,
+    "step_count": 2873,
+    "position_x": 3036,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3475.0
+  },
+  {
+    "timestamp": 430.2790689468384,
+    "step_count": 2875,
+    "position_x": 3039,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3478.0
+  },
+  {
+    "timestamp": 431.23504972457886,
+    "step_count": 2877,
+    "position_x": 3042,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3481.0
+  },
+  {
+    "timestamp": 432.2303910255432,
+    "step_count": 2879,
+    "position_x": 3045,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3484.0
+  },
+  {
+    "timestamp": 433.1191942691803,
+    "step_count": 2881,
+    "position_x": 3048,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3487.0
+  },
+  {
+    "timestamp": 433.93830013275146,
+    "step_count": 2883,
+    "position_x": 3051,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3490.0
+  },
+  {
+    "timestamp": 434.77407479286194,
+    "step_count": 2885,
+    "position_x": 3054,
+    "position_y": 200,
+    "action_name": "max_jump(30px)",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3493.0
+  },
+  {
+    "timestamp": 437.17489790916443,
+    "step_count": 2885,
+    "position_x": 3054,
+    "position_y": 200,
+    "action_name": "pipe_jump[30f+40f]",
+    "reasoning": "AI",
+    "mario_speed": 0,
+    "score": 3493.0
+  }
+]

@@ -1,5 +1,9 @@
 # Mario IA Project — Guide Claude Code
 
+## Règles générales
+- Ne jamais commiter ni pousser sur GitHub sans demande explicite
+- Ne pas utiliser d'emojis sauf si explicitement demandé
+
 ## Commandes
 ```bash
 source .venv/bin/activate && python3 mario_fluid_llm.py   # lancer le jeu

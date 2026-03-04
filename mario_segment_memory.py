@@ -118,7 +118,7 @@ class SegmentData:
         for s in sorted(self.successes, key=lambda s: -s.count):
             seq = " → ".join(s.winning_sequence)
             lines.append(
-                f"  🏆 SOLUTION x={s.x} ({s.count}x confirmée): {seq} "
+                f"   SOLUTION x={s.x} ({s.count}x confirmée): {seq} "
                 f"({s.steps_to_clear} steps) → UTILISER DIRECTEMENT"
             )
         return lines
@@ -128,7 +128,7 @@ class SegmentData:
         lines = []
         for d in sorted(self.deaths, key=lambda d: -d.count):
             lines.append(
-                f"  ⚠️ Mort x={d.x} ({d.count}x): cause={d.cause}, "
+                f"   Mort x={d.x} ({d.count}x): cause={d.cause}, "
                 f"dernière action={d.last_action} → NE PAS répéter"
             )
         return lines
@@ -141,13 +141,13 @@ class SegmentData:
         missed = [i for i in self.interactions if i.interaction_type == "item_missed"]
         lines = []
         if stomps:
-            lines.append(f"  ✅ Ennemis écrasés: {len(stomps)} (positions: {[s.x for s in stomps[:3]]})")
+            lines.append(f"   Ennemis écrasés: {len(stomps)} (positions: {[s.x for s in stomps[:3]]})")
         if blocks:
-            lines.append(f"  ✅ Blocs frappés: {len(blocks)}")
+            lines.append(f"   Blocs frappés: {len(blocks)}")
         if items:
-            lines.append(f"  ✅ Items collectés: {[i.detail for i in items]}")
+            lines.append(f"   Items collectés: {[i.detail for i in items]}")
         if missed:
-            lines.append(f"  ❌ Items loupés: {[i.detail for i in missed[:3]]} → à récupérer")
+            lines.append(f"   Items loupés: {[i.detail for i in missed[:3]]} → à récupérer")
         return lines
 
 
@@ -362,10 +362,10 @@ class MarioSegmentMemory:
                 sequences=new_sequences,
                 run_id=self._run_id,
             )
-            print(f"💾 Stage sauvegardé: safe_max_x={safe_max_x}, "
+            print(f" Stage sauvegardé: safe_max_x={safe_max_x}, "
                   f"{total_blocks} blocs, {len(new_sequences)} segments, danger: {danger_keys}")
         else:
-            print(f"⏭️ Stage non écrasé (safe_max_x={safe_max_x} vs {current.safe_max_x})")
+            print(f"⏭ Stage non écrasé (safe_max_x={safe_max_x} vs {current.safe_max_x})")
 
         self._save()
 
@@ -374,7 +374,7 @@ class MarioSegmentMemory:
         Génère le contexte mémoire pour Claude à la position actuelle.
         Inclut : le segment courant + les 3 segments suivants (anticipation élargie).
         """
-        lines = [f"📚 MÉMOIRE DES RUNS PRÉCÉDENTES ({self.total_runs} runs, record: x={self.furthest_x}px):"]
+        lines = [f" MÉMOIRE DES RUNS PRÉCÉDENTES ({self.total_runs} runs, record: x={self.furthest_x}px):"]
 
         seg_idx = int(x) // SEGMENT_SIZE
         segments_to_show = [
@@ -391,7 +391,7 @@ class MarioSegmentMemory:
                 continue
             any_data = True
 
-            approach_warn = (f", ⚠️ approche mortelle x{seg.approach_death_count}"
+            approach_warn = (f",  approche mortelle x{seg.approach_death_count}"
                              if seg.approach_death_count >= 1 else "")
             lines.append(f"\n  [{label} {key}] ({seg.passages_count} passages"
                          + approach_warn + ")")
@@ -426,7 +426,7 @@ class MarioSegmentMemory:
             return None
         for d in seg.deaths:
             if abs(d.x - x) < 30 and d.last_action == last_action and d.count >= 2:
-                return (f"⚠️ DANGER MÉMORISÉ: '{last_action}' a causé {d.count} morts "
+                return (f" DANGER MÉMORISÉ: '{last_action}' a causé {d.count} morts "
                         f"à x={d.x} dans cette zone!")
         return None
 
@@ -521,4 +521,4 @@ class MarioSegmentMemory:
                 seg.successes = successes
                 self.segments[key] = seg
         except Exception as e:
-            print(f"⚠️ Erreur chargement mémoire segments: {e}")
+            print(f" Erreur chargement mémoire segments: {e}")

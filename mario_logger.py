@@ -41,7 +41,7 @@ class MarioLogger:
         # Configuration des loggers
         self.setup_loggers()
         
-        print(f"📝 Logging activé - Session: {self.session_id}")
+        print(f" Logging activé - Session: {self.session_id}")
     
     def setup_loggers(self):
         """Configurer les différents loggers"""
@@ -124,6 +124,7 @@ class MarioLogger:
         
         self.action_logger.info(f"ACTION - Step {int(step_count):4d} | {source:7s} | {action_name:20s} | Pos({int(position_x):4d},{int(position_y):3d}) | Score:{int(score):6d} | {reasoning}")
         self.main_logger.info(f"Mario action: {action_name} at step {step_count}")
+        self.claude_logger.info(f"QUEUE PLAYED - Step {int(step_count):4d} | {source:7s} | {action_name:20s} | Pos({int(position_x):4d},{int(position_y):3d})")
     
     def log_claude_prompt(self, prompt_type: str, prompt: str, step_count: int,
                           screenshot_b64: str = None):
@@ -190,6 +191,13 @@ class MarioLogger:
         state_info = f"Mario State - Step {step_count:4d} | Pos({mario_data.get('x', 0):4d},{mario_data.get('y', 0):3d}) | Score:{mario_data.get('score', 0):6d} | Progress:{progress_data.get('status', 'unknown')}"
         self.main_logger.debug(state_info)
     
+    def log_queue_event(self, event: str, step_count: int, detail: str = ""):
+        """Logger les événements de queue d'actions dans le log Claude (PLAYED / CLEAR)"""
+        msg = f"QUEUE {event:6s} - Step {step_count:4d}"
+        if detail:
+            msg += f" | {detail}"
+        self.claude_logger.info(msg)
+
     def log_screenshot_analysis(self, step_count: int, cost: float, analysis_short: str):
         """Logger les analyses de screenshots"""
         self.claude_logger.info(f"SCREENSHOT - Step {step_count:4d} | Cost: ${cost:.4f} | Analysis: {analysis_short}")
