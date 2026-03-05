@@ -1,6 +1,6 @@
 {
   "furthest_x": 3161,
-  "total_runs": 155,
+  "total_runs": 156,
   "stage": {
     "safe_max_x": 3161,
     "total_blocks": 4,
@@ -210,7 +210,7 @@
       "segment_key": "0-100",
       "start_x": 0,
       "end_x": 100,
-      "passages_count": 193,
+      "passages_count": 200,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -220,7 +220,7 @@
       "segment_key": "100-200",
       "start_x": 100,
       "end_x": 200,
-      "passages_count": 193,
+      "passages_count": 200,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -242,7 +242,7 @@
       "segment_key": "200-300",
       "start_x": 200,
       "end_x": 300,
-      "passages_count": 191,
+      "passages_count": 198,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
@@ -431,6 +431,24 @@
           "interaction_type": "item_collected",
           "detail": "coin",
           "points": 200
+        },
+        {
+          "x": 249,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 249,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 257,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
         }
       ],
       "successes": [
@@ -483,7 +501,7 @@
       "segment_key": "300-400",
       "start_x": 300,
       "end_x": 400,
-      "passages_count": 176,
+      "passages_count": 183,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
@@ -590,7 +608,7 @@
       "segment_key": "400-500",
       "start_x": 400,
       "end_x": 500,
-      "passages_count": 130,
+      "passages_count": 137,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [
@@ -673,7 +691,7 @@
             "run_forward"
           ],
           "steps_to_clear": 71,
-          "count": 6
+          "count": 7
         },
         {
           "x": 434,
@@ -751,6 +769,39 @@
           ],
           "steps_to_clear": 72,
           "count": 6
+        },
+        {
+          "x": 434,
+          "winning_sequence": [
+            "step_back",
+            "obstacle_jump",
+            "run_forward",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 71,
+          "count": 1
+        },
+        {
+          "x": 439,
+          "winning_sequence": [
+            "run_forward",
+            "pipe_jump",
+            "run_forward",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 27,
+          "count": 1
+        },
+        {
+          "x": 438,
+          "winning_sequence": [
+            "run_forward",
+            "run_forward",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "steps_to_clear": 28,
+          "count": 1
         }
       ]
     },
@@ -758,7 +809,7 @@
       "segment_key": "500-600",
       "start_x": 500,
       "end_x": 600,
-      "passages_count": 121,
+      "passages_count": 124,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -908,7 +959,7 @@
       "segment_key": "600-700",
       "start_x": 600,
       "end_x": 700,
-      "passages_count": 117,
+      "passages_count": 120,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -939,7 +990,7 @@
       "segment_key": "700-800",
       "start_x": 700,
       "end_x": 800,
-      "passages_count": 90,
+      "passages_count": 93,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1096,6 +1147,28 @@
           ],
           "steps_to_clear": 33,
           "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "obstacle_jump",
+            "pipe_jump",
+            "pipe_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 67,
+          "count": 1
+        },
+        {
+          "x": 722,
+          "winning_sequence": [
+            "step_back",
+            "run_forward",
+            "pipe_jump",
+            "run_jump_over"
+          ],
+          "steps_to_clear": 142,
+          "count": 1
         }
       ]
     },
@@ -1103,7 +1176,7 @@
       "segment_key": "800-900",
       "start_x": 800,
       "end_x": 900,
-      "passages_count": 55,
+      "passages_count": 57,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1247,6 +1320,17 @@
           ],
           "steps_to_clear": 42,
           "count": 2
+        },
+        {
+          "x": 898,
+          "winning_sequence": [
+            "step_back",
+            "run_jump_over",
+            "max_jump",
+            "pipe_jump"
+          ],
+          "steps_to_clear": 50,
+          "count": 1
         }
       ]
     },
@@ -1254,7 +1338,7 @@
       "segment_key": "900-1000",
       "start_x": 900,
       "end_x": 1000,
-      "passages_count": 43,
+      "passages_count": 45,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1286,7 +1370,7 @@
       "segment_key": "1000-1100",
       "start_x": 1000,
       "end_x": 1100,
-      "passages_count": 29,
+      "passages_count": 30,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1296,7 +1380,7 @@
       "segment_key": "1100-1200",
       "start_x": 1100,
       "end_x": 1200,
-      "passages_count": 29,
+      "passages_count": 30,
       "approach_death_count": 0,
       "deaths": [],
       "interactions": [],
@@ -1306,7 +1390,7 @@
       "segment_key": "1200-1300",
       "start_x": 1200,
       "end_x": 1300,
-      "passages_count": 14,
+      "passages_count": 15,
       "approach_death_count": 2,
       "deaths": [],
       "interactions": [],
@@ -1316,7 +1400,7 @@
       "segment_key": "1300-1400",
       "start_x": 1300,
       "end_x": 1400,
-      "passages_count": 14,
+      "passages_count": 15,
       "approach_death_count": 8,
       "deaths": [],
       "interactions": [],
@@ -1326,7 +1410,7 @@
       "segment_key": "1400-1500",
       "start_x": 1400,
       "end_x": 1500,
-      "passages_count": 14,
+      "passages_count": 15,
       "approach_death_count": 7,
       "deaths": [
         {
@@ -1395,7 +1479,7 @@
       "segment_key": "1500-1600",
       "start_x": 1500,
       "end_x": 1600,
-      "passages_count": 9,
+      "passages_count": 10,
       "approach_death_count": 1,
       "deaths": [
         {
