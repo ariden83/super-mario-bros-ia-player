@@ -1,0 +1,209 @@
+{
+  "furthest_x": 873,
+  "total_runs": 1,
+  "stage": {
+    "safe_max_x": 600,
+    "total_blocks": 1,
+    "total_steps": 310,
+    "danger_keys": [
+      "600-700",
+      "700-800"
+    ],
+    "sequences": {},
+    "run_id": null
+  },
+  "segments": {
+    "0-100": {
+      "segment_key": "0-100",
+      "start_x": 0,
+      "end_x": 100,
+      "passages_count": 3,
+      "approach_death_count": 0,
+      "deaths": [],
+      "interactions": [],
+      "successes": []
+    },
+    "100-200": {
+      "segment_key": "100-200",
+      "start_x": 100,
+      "end_x": 200,
+      "passages_count": 3,
+      "approach_death_count": 0,
+      "deaths": [],
+      "interactions": [
+        {
+          "x": 172,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 169,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        }
+      ],
+      "successes": []
+    },
+    "200-300": {
+      "segment_key": "200-300",
+      "start_x": 200,
+      "end_x": 300,
+      "passages_count": 3,
+      "approach_death_count": 0,
+      "deaths": [],
+      "interactions": [],
+      "successes": [
+        {
+          "x": 281,
+          "winning_sequence": [
+            "step_back",
+            "pipe_jump",
+            "step_back",
+            "step_back"
+          ],
+          "steps_to_clear": 71,
+          "count": 1
+        }
+      ]
+    },
+    "300-400": {
+      "segment_key": "300-400",
+      "start_x": 300,
+      "end_x": 400,
+      "passages_count": 3,
+      "approach_death_count": 0,
+      "deaths": [],
+      "interactions": [],
+      "successes": []
+    },
+    "400-500": {
+      "segment_key": "400-500",
+      "start_x": 400,
+      "end_x": 500,
+      "passages_count": 2,
+      "approach_death_count": 6,
+      "deaths": [],
+      "interactions": [],
+      "successes": []
+    },
+    "500-600": {
+      "segment_key": "500-600",
+      "start_x": 500,
+      "end_x": 600,
+      "passages_count": 2,
+      "approach_death_count": 6,
+      "deaths": [],
+      "interactions": [],
+      "successes": []
+    },
+    "600-700": {
+      "segment_key": "600-700",
+      "start_x": 600,
+      "end_x": 700,
+      "passages_count": 2,
+      "approach_death_count": 1,
+      "deaths": [
+        {
+          "x": 661,
+          "cause": "enemy_hit",
+          "last_action": "pipe_jump",
+          "approach_actions": [
+            "run_jump_over",
+            "pipe_jump",
+            "pipe_jump"
+          ],
+          "count": 1
+        },
+        {
+          "x": 672,
+          "cause": "enemy_hit",
+          "last_action": "run_jump_over",
+          "approach_actions": [
+            "pipe_jump",
+            "obstacle_jump",
+            "run_jump_over"
+          ],
+          "count": 5
+        }
+      ],
+      "interactions": [
+        {
+          "x": 632,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        },
+        {
+          "x": 635,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        }
+      ],
+      "successes": []
+    },
+    "700-800": {
+      "segment_key": "700-800",
+      "start_x": 700,
+      "end_x": 800,
+      "passages_count": 2,
+      "approach_death_count": 2,
+      "deaths": [],
+      "interactions": [],
+      "successes": []
+    },
+    "800-900": {
+      "segment_key": "800-900",
+      "start_x": 800,
+      "end_x": 900,
+      "passages_count": 2,
+      "approach_death_count": 1,
+      "deaths": [
+        {
+          "x": 873,
+          "cause": "enemy_hit",
+          "last_action": "obstacle_jump",
+          "approach_actions": [
+            "pipe_vertical_jump",
+            "pipe_jump",
+            "obstacle_jump"
+          ],
+          "count": 1
+        }
+      ],
+      "interactions": [],
+      "successes": []
+    },
+    "900-1000": {
+      "segment_key": "900-1000",
+      "start_x": 900,
+      "end_x": 1000,
+      "passages_count": 1,
+      "approach_death_count": 0,
+      "deaths": [
+        {
+          "x": 975,
+          "cause": "enemy_hit",
+          "last_action": "run_jump_over",
+          "approach_actions": [
+            "run_jump_over",
+            "run_jump_over",
+            "run_jump_over"
+          ],
+          "count": 1
+        }
+      ],
+      "interactions": [
+        {
+          "x": 930,
+          "interaction_type": "item_collected",
+          "detail": "coin",
+          "points": 200
+        }
+      ],
+      "successes": []
+    }
+  }
+}

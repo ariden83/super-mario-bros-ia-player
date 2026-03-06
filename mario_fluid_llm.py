@@ -67,7 +67,7 @@ class MarioFluidLLM:
             # Mouvements de base
             'walk_right': {'base_action': 1, 'duration': 15, 'description': 'Marcher à droite'},
             'run_forward': {'base_action': 3, 'duration': 25, 'description': 'Courir vers la droite (plus rapide)'},
-            'step_back': {'base_action': 6, 'duration': 6, 'description': 'Reculer/éviter danger'},
+            'step_back': {'base_action': 6, 'duration': 20, 'description': 'Reculer/éviter danger (~60px par défaut)'},
             'wait': {'base_action': 0, 'duration': 3, 'description': 'Attendre/observer'},
 
             # Sauts tactiques
@@ -101,7 +101,7 @@ class MarioFluidLLM:
                 ],
                 'description': 'APPROCHE EN COURANT + SAUT MAX pour franchir un tuyau haut : run 30f jusqu\'au pied, puis saut max 40f'
             },
-            # obstacle_jump : course puis saut max pour obstacles larges ou plateforme élevée
+            # obstacle_jump : course puis saut max pour obstacles MOYENS (pas les tuyaux hauts)
             #   Phase 1 : prendre de la vitesse (20 frames right+B)
             #   Phase 2 : saut max avec élan (40 frames right+A+B)
             'obstacle_jump': {
@@ -109,7 +109,28 @@ class MarioFluidLLM:
                     {'base_action': 3, 'duration': 20},   # right+B → élan
                     {'base_action': 4, 'duration': 40},   # right+A+B → saut max avec vitesse
                 ],
-                'description': 'ÉLAN + SAUT MAX pour obstacles larges ou plateformes élevées (course 20f + saut max 40f)'
+                'description': 'ÉLAN COURT + SAUT MAX pour obstacles MOYENS (hauteur 20-40px, course 20f + saut 40f). Pour obstacles HAUTS (>40px) utilise high_obstacle_jump ou pipe_jump.'
+            },
+            # high_obstacle_jump : élan LONG + saut max — pour TUYAUX TRES HAUTS ou plateformes très élevées
+            #   Phase 1 : longue accélération (40 frames right+B) → plus de momentum que pipe_jump
+            #   Phase 2 : saut max avec élan maximal (40 frames right+A+B)
+            'high_obstacle_jump': {
+                'phases': [
+                    {'base_action': 3, 'duration': 40},   # right+B → élan long
+                    {'base_action': 4, 'duration': 40},   # right+A+B → saut max avec vitesse max
+                ],
+                'description': 'ÉLAN LONG + SAUT MAX pour obstacles TRES HAUTS (>40px). Nécessite de l\'espace devant Mario (>30px). Si Mario est collé au tuyau (<30px), utilise pipe_vertical_jump à la place.'
+            },
+            # pipe_vertical_jump : saut VERTICAL puis dérive droite — technique NES classique pour tuyaux hauts
+            #   Quand Mario est collé au tuyau (< 30px), il ne peut pas prendre d'élan forward.
+            #   Phase 1 : saut vertical pur (A seulement, 15 frames) → monte sans avancer → pas de collision
+            #   Phase 2 : dérive droite + A (right+A, 30 frames) → glisse sur le dessus du tuyau au sommet du saut
+            'pipe_vertical_jump': {
+                'phases': [
+                    {'base_action': 5, 'duration': 15},   # A only → saut vertical pur, zéro déplacement horizontal
+                    {'base_action': 2, 'duration': 30},   # right+A → dérive vers la droite au sommet du saut
+                ],
+                'description': 'SAUT VERTICAL + dérive droite. Pour tuyaux TRES HAUTS (>50px) quand Mario est COLLÉ au tuyau (<30px). Saute sur place (pas de collision), puis glisse sur le dessus au sommet.'
             },
 
             # Actions tactiques spécifiques
@@ -232,6 +253,7 @@ class MarioFluidLLM:
         self._last_known_pipe_dist = None
         self._last_known_hole_dist = None
         self.last_pipe_trigger_step = -60  # déplacé ici (était en double)
+        self._threshold_restitution_steps = {}  # {(type, seuil): step} — anti-spam restitution
 
         # Système de rewind sur mort
         self.rewind_buffer = deque(maxlen=3)  # 3 checkpoints (60 frames d'écart)
@@ -245,6 +267,7 @@ class MarioFluidLLM:
         self._rewind_index = None             # Index dans _final_action_history où le dernier rewind a eu lieu
         self._perfect_start_ram = None         # Snapshot RAM du checkpoint rewind (pour restaurer timing ennemis)
         self._perfect_start_x = 0             # x_pos du checkpoint rewind
+        self._rewind_checkpoints = []          # Liste de {index, ram, x} — un par rewind (pour replay multi-rewind)
         self._claude_generation = 0            # Incrémenté à chaque rewind pour invalider threads en cours
         self._death_positions = []             # Historique des positions de mort pour le message rewind
         self._danger_zone_x = None             # Position X à éviter après rewind (filet de sécurité)
@@ -252,9 +275,11 @@ class MarioFluidLLM:
         self._ppu_warmup_until = 0             # Step jusqu'auquel bloquer Claude (PPU pas encore sync après rewind)
         self._mid_jump_pause_triggered = False  # True si la pause d'urgence en plein saut a déjà été déclenchée
         self._mid_air_called = False            # True si Claude a déjà été consulté pour l'atterrissage ce saut
-        self._mid_air_emergency_called = False  # True si l'appel d'urgence (ennemi proche descent) a déjà eu lieu
+        self._mid_air_emergency_called = False  # inutilisé, conservé pour compat
+        self._mid_air_prev_y = 0               # y_pos frame précédente, pour détecter la descente
         self._jump_aborted = False              # True si le saut a été avorté par la pause (frames_left forcé à 0)
         self._pre_jump_ram = None              # RAM snapshot juste avant une macro de saut
+        self._pre_jump_has_full_backup = False  # True si _backup() complet pris au pré-saut
         self._pre_jump_x = 0                   # x_pos au moment du pré-saut
         self._pre_jump_y = 200                 # y_pos au moment du pré-saut (doit être sur le sol)
         self._pre_jump_history_len = 0         # len(_final_action_history) au pré-saut
@@ -1211,7 +1236,7 @@ class MarioFluidLLM:
             _ss_bucket = int(mario_x // 50) * 50
             _ss_blocked = getattr(self, '_blocked_macros_by_pos', {}).get(_ss_bucket, set())
             if _ss_blocked:
-                _all_jumps = {'max_jump', 'pipe_jump', 'obstacle_jump', 'run_jump_over'}
+                _all_jumps = {'max_jump', 'pipe_jump', 'obstacle_jump', 'high_obstacle_jump', 'pipe_vertical_jump', 'run_jump_over'}
                 _not_tried = sorted(_all_jumps - _ss_blocked)
                 _hint = f" ESSAIE PLUTÔT: {', '.join(_not_tried)}" if _not_tried else " Tous les sauts échoués — tente step_back + élan"
                 _ss_blocked_block = (f"\n ACTIONS DÉJÀ ESSAYÉES SANS SUCCÈS à x≈{_ss_bucket}: {', '.join(sorted(_ss_blocked))}"
@@ -1292,21 +1317,22 @@ class MarioFluidLLM:
                     _enemy_hint = "run_jump_over (stomp a déjà échoué ici — SAUTER par-dessus est plus sûr)"
                     _enemy_default = "run_jump_over"
                 else:
-                    _enemy_hint = "run_jump_over (recommandé — passe par-dessus en sécurité)"
+                    _enemy_hint = "run_jump_over (recommandé — sauter par-dessus l'ennemi)"
                     _enemy_default = "run_jump_over"
                 prompt = _rewind_block + f"""⚠️⚠️⚠️ ENNEMI DÉTECTÉ — DÉCISION URGENTE ⚠️⚠️⚠️
 Mario: X={mario_x}px | Step: {step_count} | Score: {mario['score']}
 ENNEMI à {dist}px DEVANT Mario (position écran x={closest['x_screen']}).
 
-Regarde le screenshot et CHOISIS:
-  A) run_jump_over → SAUTER par-dessus l'ennemi ({_enemy_hint}).
-  B) stomp_enemy  → ÉCRASER l'ennemi (seulement si tu es certain de le surplomber).
-  C) pipe_jump    → SEULEMENT si tu vois un TUYAU HAUT entre Mario et l'ennemi.
-
-❌ INTERDIT: run_forward (Mario fonce dans l'ennemi → mort garantie)
+Ennemi détecté à environ {dist}px. Regarde le screenshot et CHOISIS:
+  A) run_jump_over px=<distance_saut> [approach_px=<élan_optionnel>]
+     → Sauter PAR-DESSUS l'ennemi.
+     → px = distance que le saut doit couvrir (en pixels NES).
+     → approach_px = frames de course avant le saut pour prendre de l'élan (0 ou omis = saut immédiat).
+  B) stomp_enemy px=<distance_approche>
+     → Écraser l'ennemi en sautant dessus (px = distance à courir avant de sauter).
 
 JSON uniquement — 1 seule action:
-{{"actions":[{{"macro_action":"{_enemy_default}"}}],"urgency":10}}"""
+{{"actions":[{{"macro_action":"run_jump_over","px":<ta_valeur>}}],"urgency":10}}"""
             elif _hole_urgent:
                 # PROMPT COURT — trou devant : décision urgente
                 #  JAMAIS de px pour max_jump sur trou urgent !
@@ -1364,16 +1390,29 @@ JSON uniquement — 1 seule action:
                 if _pipe_ahead_info.get('detected'):
                     _pipe_dist_a = _pipe_ahead_info.get('distance_px', '?')
                     _pipe_h_a = _pipe_ahead_info.get('height_px', '?')
-                    # Recommandation de saut selon la hauteur de l'obstacle
+                    # Recommandation de saut selon la hauteur ET la distance à l'obstacle
                     try:
                         _h_val = int(_pipe_h_a)
                     except (ValueError, TypeError):
                         _h_val = 0
+                    try:
+                        _d_val = int(_pipe_dist_a)
+                    except (ValueError, TypeError):
+                        _d_val = 999
                     if _h_val >= 50:
-                        _jump_rec = (
-                            f"\n→ Obstacle TRES HAUT ({_h_val}px): utilise pipe_jump px=80 (longue approche obligatoire) "
-                            f"ou obstacle_jump px=60. N'utilise PAS max_jump seul (pas assez d'élan)."
-                        )
+                        if _d_val < 30:
+                            # Obstacle très proche ET très haut : toute approche forward heurte le tuyau.
+                            # Technique NES : saut vertical pur (A seulement) puis dérive droite au sommet.
+                            _jump_rec = (
+                                f"\n→ Obstacle TRES HAUT ({_h_val}px) à seulement {_d_val}px: "
+                                f"OBLIGATOIRE — utilise pipe_vertical_jump (saut vertical + dérive droite au sommet). "
+                                f"N'utilise PAS high_obstacle_jump, obstacle_jump ni pipe_jump (l'élan forward heurterait le mur du tuyau avant que le saut commence)."
+                            )
+                        else:
+                            _jump_rec = (
+                                f"\n→ Obstacle TRES HAUT ({_h_val}px): utilise pipe_jump px=80 (approche + saut max) "
+                                f"ou high_obstacle_jump px=80 (élan long). N'utilise PAS obstacle_jump ni max_jump seul."
+                            )
                     elif _h_val >= 30:
                         _jump_rec = (
                             f"\n→ Obstacle HAUT ({_h_val}px): utilise pipe_jump px=60 ou obstacle_jump px=50."
@@ -1401,15 +1440,17 @@ REGARDE LE SCREENSHOT — QUE VOIS-TU DIRECTEMENT A DROITE DU SPRITE DE MARIO ?
   Sol plat libre     => run_forward px=<distance NES jusqu'au prochain obstacle>
   Tuyau vert         => pipe_jump px=<distance NES jusqu'au tuyau>  (px = approche d'élan)
   Sol absent / vide  => max_jump px=<distance d'approche avant bord>
-  Ennemi             => run_jump_over px=<distance_ennemi>  ou  stomp_enemy px=<distance_ennemi - 10>
+  Ennemi             => run_jump_over px=<distance_saut> approach_px=<élan> ou stomp_enemy px=<distance_ennemi - 10>
 
 "px" = distance en pixels NES entre Mario et l'obstacle dans le screenshot. OBLIGATOIRE sur toutes les actions.
   Bord droit de l'écran ≈ 210px. Mi-écran ≈ 105px. Quart d'écran ≈ 50px.
   Évalue la vraie distance — ne pas toujours mettre la même valeur !
 
 ACTIONS DISPONIBLES (toutes avec px obligatoire):
-  run_forward px | pipe_jump px | max_jump px | obstacle_jump px
-  run_jump_over px | stomp_enemy px | step_back
+  run_forward px | pipe_jump px | max_jump px
+  obstacle_jump px (obstacles MOYENS 20-40px) | high_obstacle_jump px (obstacles HAUTS >40px, si espace >30px)
+  pipe_vertical_jump (tuyau TRES HAUT >50px ET Mario COLLÉ <30px — saut vertical puis dérive droite)
+  run_jump_over px approach_px (optionnel) | stomp_enemy px | step_back
   high_jump (saut vertical haut, utile escalier) | big_jump_right (saut max vers droite)
   DOUBLE SAUT possible : donne 2 sauts consécutifs ex: {{"actions":[{{"macro_action":"obstacle_jump"}},{{"macro_action":"max_jump"}}],"urgency":9}}
 
@@ -1519,7 +1560,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
             for e in oam_enemies:
                 dist = e['distance_px']
                 if dist > 0:
-                    action_hint = "stomp_enemy" if dist <= 60 else "run_jump_over"
+                    action_hint = "stomp_enemy ou max_jump"
                     enemy_movement_section += (
                         f"\n   Ennemi à {dist}px DEVANT Mario (écran x={e['x_screen']}) "
                         f"→ ACTION REQUISE: {action_hint}"
@@ -1528,7 +1569,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
                     enemy_movement_section += (
                         f"\n  ℹ Ennemi à {abs(dist)}px DERRIÈRE Mario (écran x={e['x_screen']})"
                     )
-            enemy_movement_section += "\n NE PAS faire run_forward si un ennemi est devant — utilise stomp_enemy ou run_jump_over D'ABORD"
+            enemy_movement_section += "\n NE PAS faire run_forward si un ennemi est devant — utilise stomp_enemy ou max_jump D'ABORD"
         else:
             enemy_movement_section = "\n Aucun ennemi OAM détecté à l'écran"
 
@@ -1568,7 +1609,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
         _mario_bucket = int(mario['x'] // 50) * 50
         _blocked_here = getattr(self, '_blocked_macros_by_pos', {}).get(_mario_bucket, set())
         if _blocked_here:
-            _all_jumps = {'max_jump', 'pipe_jump', 'obstacle_jump', 'run_jump_over'}
+            _all_jumps = {'max_jump', 'pipe_jump', 'high_obstacle_jump', 'pipe_vertical_jump', 'obstacle_jump', 'run_jump_over'}
             _not_tried_here = sorted(_all_jumps - _blocked_here)
             _hint_here = f" ESSAIE PLUTÔT: {', '.join(_not_tried_here)}" if _not_tried_here else " Tous les sauts échoués — tente step_back + élan"
             _blocked_section = (f"\n ACTIONS DÉJÀ ESSAYÉES SANS SUCCÈS à x≈{_mario_bucket}: {', '.join(sorted(_blocked_here))}"
@@ -1623,7 +1664,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
 4. ✅ Si ennemi "S'ÉLOIGNE" → run_forward pour le rattraper et le stomp (ou passer s'il est trop loin)
 5. ⚡ EN CAS DE DOUTE → run_forward pour approcher, puis stomp_enemy quand < 50px
 6. 🎯 Priorité absolue: SURVIE > Collecte de blocs/items
-7. ⛰️ TROU DÉTECTÉ → max_jump SANS px IMMÉDIATEMENT (❌ jamais px = courir jusqu'au bord = chute garantie)
+7. ⛰️ TROU DÉTECTÉ → max_jump px=<approche> (trou loin) ou max_jump sans px (trou immédiat <20px). "px" = distance à courir AVANT de sauter, PAS la largeur du trou.
 8. ⚠️ APRÈS stomp_enemy : NE PAS mettre run_forward si ennemi encore visible !
 
 🎯 DONNE 2-3 ACTIONS ADAPTÉES À LA SITUATION!
@@ -1635,7 +1676,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
 Exemples avec distances réelles:
 Ennemi à 15px: {{"actions":[{{"macro_action":"stomp_enemy","px":5}}],"urgency":10}}
 Ennemi à 40px: {{"actions":[{{"macro_action":"stomp_enemy","px":30}}],"urgency":10}}
-Ennemi à 80px: {{"actions":[{{"macro_action":"run_jump_over","px":70}}],"urgency":8}}
+Ennemi à 80px: {{"actions":[{{"macro_action":"run_jump_over","px":80,"approach_px":20}}],"urgency":8}}
 Tuyau à 100px: {{"actions":[{{"macro_action":"run_forward","px":60}},{{"macro_action":"pipe_jump","px":30}}],"urgency":6}}
 Zone libre 200px: {{"actions":[{{"macro_action":"run_forward","px":60}}],"urgency":4}}
 Trou à 85px: {{"actions":[{{"macro_action":"max_jump","px":55}}],"urgency":10}}
@@ -1866,7 +1907,8 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":60}}],"urgency
                 for action_data in actions_data:
                     if isinstance(action_data, dict):
                         macro_name = action_data.get('macro_action', 'walk_right')
-                        px = action_data.get('px')  # distance en pixels (optionnel)
+                        px = action_data.get('px')           # distance en pixels (optionnel)
+                        approach_px = action_data.get('approach_px')  # run_jump_over : course avant saut
 
                         # Valider la macro-action
                         if macro_name not in self.macro_actions:
@@ -1881,14 +1923,24 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":60}}],"urgency
                         }
                         if px is not None:
                             try:
-                                action_dict['px'] = int(px)
+                                # +5px offset (espace screenshot) avant conversion → pixels jeu NES.
+                                # Claude estime les distances sur un screenshot redimensionné (plus
+                                # petit que le jeu natif) → ses valeurs px sont systématiquement
+                                # sous-estimées. On corrige : (px_claude + 5) * scale_factor.
+                                _raw_px = int(px) + 5
+                                action_dict['px'] = int(round(_raw_px * self.current_scale_factor))
+                            except (ValueError, TypeError):
+                                pass
+                        if approach_px is not None:
+                            try:
+                                action_dict['approach_px'] = int(approach_px)
                             except (ValueError, TypeError):
                                 pass
                         actions_list.append(action_dict)
 
                 if actions_list:
                     # Détecter la hallucination des exemples verbatim :
-                    # si Claude renvoie exactement run_forward+pipe_jump+stomp+run_jump_over+max_jump
+                    # si Claude renvoie exactement run_forward+pipe_jump+stomp+max_jump
                     # avec les valeurs canoniques des exemples du prompt → réponse invalide.
                     _example_sig = {('run_forward', 140), ('pipe_jump', 80), ('stomp_enemy', 35),
                                     ('run_jump_over', 45), ('max_jump', 30)}
@@ -2162,12 +2214,12 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":60}}],"urgency
     # Chaque valeur déclenche Claude une fois quand l'obstacle passe sous ce seuil de distance.
     # World 1-2 : fond souterrain noir → faux positifs trous fréquents → seuils réduits.
     _LEVEL_THRESHOLDS = {
-        (1, 1): {'enemy': [180, 100, 50], 'pipe': [],               'hole': [200, 130, 70, 35]},
-        (1, 2): {'enemy': [150,  80, 40], 'pipe': [],               'hole': [ 80,  45, 20]},
-        (1, 3): {'enemy': [180, 100, 50], 'pipe': [],               'hole': [150,  80, 40]},
-        (1, 4): {'enemy': [150,  80, 40], 'pipe': [],               'hole': [100,  50, 25]},
+        (1, 1): {'enemy': [180, 100, 50], 'pipe': [150, 80, 40], 'hole': [200, 130, 70, 35]},
+        (1, 2): {'enemy': [150,  80, 40], 'pipe': [150, 80, 40], 'hole': [ 80,  45, 20]},
+        (1, 3): {'enemy': [180, 100, 50], 'pipe': [150, 80, 40], 'hole': [150,  80, 40]},
+        (1, 4): {'enemy': [150,  80, 40], 'pipe': [150, 80, 40], 'hole': [100,  50, 25]},
     }
-    _LEVEL_THRESHOLDS_DEFAULT = {'enemy': [180, 100, 50], 'pipe': [], 'hole': [200, 130, 70, 35]}
+    _LEVEL_THRESHOLDS_DEFAULT = {'enemy': [180, 100, 50], 'pipe': [150, 80, 40], 'hole': [200, 130, 70, 35]}
 
     def _get_level_thresholds(self):
         """Retourne les seuils de détection pour le niveau courant."""
@@ -2383,7 +2435,10 @@ Après obstacle: {{"actions":[{{"macro_action":"run_forward","px":60}}],"urgency
                           (np.abs(b - sky_b) < 30))
                 # Pixel "obstacle" = visible et pas ciel (tuyau vert OU brique)
                 is_bright = (r > 50) | (g > 50)
-                is_obstacle = (~is_sky) & is_bright
+                # Exclure les décors (buissons/collines verts) : vert dominant = décor d'arrière-plan
+                # Même logique que l'obfuscation des screenshots envoyés à Claude (ligne ~1201)
+                is_decoration = (g - r > 40) & (g - b > 40) & (g > 80)
+                is_obstacle = (~is_sky) & is_bright & (~is_decoration)
 
                 n_obs = int(np.sum(is_obstacle))
                 if n_obs >= 4:  # ≥4 pixels consécutifs = obstacle réel (pas bruit)
@@ -2705,6 +2760,7 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
             self._rewind_active = False
             self._post_rewind_block_inject = False
             self._pre_jump_ram = None
+            self._pre_jump_has_full_backup = False
             self._pre_jump_x = 0
             self._pre_jump_y = 200
             self._pre_jump_history_len = 0
@@ -2723,37 +2779,129 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
             import traceback; traceback.print_exc()
             return False
 
-    def call_claude_landing_sync(self, obs, mario_x: int, frames_left: int, step_count: int) -> str:
+    def call_claude_landing_sync(self, obs, mario_x: int, frames_left: int, step_count: int,
+                                 scan_enemy_dist: int = None) -> str:
         """Appel Claude Haiku synchrone pendant un saut pour décider de l'atterrissage.
         Retourne : 'far' | 'short' | 'left' | 'stop'
         - far   → garder right+A+B (atterrir loin)
         - short → relâcher A, réduire frames (atterrir court)
         - left  → virer à gauche
         - stop  → chute verticale (NOOP)
+        scan_enemy_dist : distance ennemi vue par le SCAN (plus fiable que OAM en saut).
         """
         enemies = self.get_enemies_from_oam()
-        enemy_front = [e for e in enemies if 0 < e['distance_px'] < 150]
+        enemy_front = [e for e in enemies if 0 < e['distance_px'] < 200]
         hole = self.detect_holes_ahead(obs) if obs is not None else {}
         pipe = self.detect_pipe_ahead(obs) if obs is not None else {}
 
-        enemy_str = ', '.join(f"ennemi à {e['distance_px']}px" for e in enemy_front) or 'aucun'
+        # Utiliser la distance SCAN si OAM ne voit pas l'ennemi (peut être "derrière" en OAM)
+        oam_dist = enemy_front[0]['distance_px'] if enemy_front else None
+        best_enemy_dist = oam_dist
+        if best_enemy_dist is None and scan_enemy_dist is not None and scan_enemy_dist > 0:
+            best_enemy_dist = scan_enemy_dist
+            enemy_str = f"ennemi à ~{scan_enemy_dist}px (SCAN)"
+        elif enemy_front:
+            enemy_str = ', '.join(f"ennemi à {e['distance_px']}px" for e in enemy_front)
+        else:
+            enemy_str = 'aucun'
+
         hole_str = f"trou à {hole['nearest']}px (larg {hole['width']}px)" if hole.get('detected') else 'aucun'
         pipe_str = f"obstacle à {pipe['distance_px']}px (h={pipe['height_px']}px)" if pipe.get('detected') else 'aucun'
-        # Estimation de la distance parcourue dans les frames restantes (~3px/frame)
-        _est_travel = frames_left * 3
+
+        # Estimation de la vitesse horizontale selon l'action de base du saut.
+        # action 4 = right+A+B (max speed) → ~3px/frame
+        # action 2 = right+A (jump, no run)  → ~1.5px/frame (saut quasi-vertical, peu d'élan)
+        # action 3 = right+B (run only)      → ~2.5px/frame
+        _base_act = self.current_macro.get('base_action', 4) if self.current_macro else 4
+        if _base_act == 4:
+            _px_per_frame = 3.0
+        elif _base_act == 2:
+            _px_per_frame = 1.5  # run_jump_over : saut lent, faible déplacement horizontal
+        else:
+            _px_per_frame = 2.5
+        _est_travel = int(frames_left * _px_per_frame)
+        # Zone de danger = distance d'atterrissage + zone de réaction sol (~60px)
+        _danger_zone = _est_travel + 60
+
+        # ── Prédictions d'atterrissage ────────────────────────────────────────────
+        # Vitesse enemy ~2px/frame vers Mario (Goomba marchant à gauche)
+        _enemy_speed = 2
+        # Distance parcourue par Mario si "short" (8 frames NOOP max)
+        # NOOP = plus de poussée horizontale → décélération rapide ≈ 1px/frame (friction NES)
+        # NE PAS utiliser _px_per_frame ici (qui est la vitesse active right+A+B)
+        _short_frames = min(frames_left, 8)
+        _short_land_px = int(_short_frames * 1.0)  # ~1px/frame avec NOOP
+
+        def _predict(land_px, fly_frames):
+            """Calcule la situation (ennemi, trou) au moment de l'atterrissage."""
+            result = {}
+            if best_enemy_dist is not None:
+                # Position de l'ennemi au moment de l'atterrissage (il marche vers Mario)
+                enemy_at_land = best_enemy_dist - land_px - (fly_frames * _enemy_speed)
+                if enemy_at_land < -10:
+                    result['enemy'] = f"ennemi DÉPASSÉ ({abs(int(enemy_at_land))}px derrière) → sûr"
+                elif -10 <= enemy_at_land <= 20:
+                    result['enemy'] = f"ennemi à {int(enemy_at_land)}px → STOMP (Mario atterrit dessus)"
+                else:
+                    result['enemy'] = f"ennemi encore à {int(enemy_at_land)}px devant → danger"
+            if hole.get('detected'):
+                h_near = hole['nearest']
+                h_width = hole.get('width', 32)
+                # Mario atterrit à land_px devant lui — est-ce dans le trou ?
+                if land_px < h_near:
+                    result['hole'] = f"trou à {h_near - land_px}px après l'atterrissage → OK"
+                elif land_px <= h_near + h_width:
+                    result['hole'] = f"Mario atterrit DANS le trou → mort !"
+                else:
+                    result['hole'] = f"Mario atterrit {land_px - h_near - h_width}px après le trou → OK"
+            return result
+
+        _pred_far   = _predict(_est_travel, frames_left)
+        _pred_short = _predict(_short_land_px, _short_frames)
+
+        def _fmt(pred):
+            parts = []
+            if 'enemy' in pred: parts.append(pred['enemy'])
+            if 'hole'  in pred: parts.append(pred['hole'])
+            return ' | '.join(parts) if parts else 'voie libre'
+
+        _stomp_window = 20
+        # Conseil basé sur les prédictions
+        _far_enemy = _pred_far.get('enemy', '')
+        _short_enemy = _pred_short.get('enemy', '')
+        _short_hole_fatal = 'mort' in _pred_short.get('hole', '')
+        _far_hole_fatal = 'mort' in _pred_far.get('hole', '')
+        if 'STOMP' in _far_enemy:
+            _conseil = f"→ \"far\" = {_fmt(_pred_far)} ✓ STOMP possible | \"short\" = {_fmt(_pred_short)}"
+        elif 'DÉPASSÉ' in _far_enemy:
+            # Ennemi prédit derrière avec far : est-ce que short est aussi sûr ?
+            _short_ok = ('DÉPASSÉ' in _short_enemy or 'danger' not in _short_enemy) and not _short_hole_fatal
+            if _short_ok:
+                _conseil = f"→ Les 2 atterrissages évitent l'ennemi. Préfère \"short\" (atterrir plus près = moins de risque de tomber dans l'inconnu)."
+            else:
+                _conseil = f"→ \"far\" = {_fmt(_pred_far)} ✓ | \"short\" = {_fmt(_pred_short)} ✗ danger"
+        elif 'danger' in _far_enemy:
+            _conseil = f"→ \"far\" = {_fmt(_pred_far)} ✗ | \"short\" = {_fmt(_pred_short)}"
+        elif best_enemy_dist is None and not hole.get('detected'):
+            _conseil = "→ Voie libre. Préfère \"short\" pour atterrir plus près et rester en terrain connu."
+        else:
+            _conseil = f"→ \"far\" = {_fmt(_pred_far)} | \"short\" = {_fmt(_pred_short)}"
 
         prompt = f"""Mario est EN L'AIR. frames_left={frames_left}. X={mario_x}.
-Distance estimée restante : ~{_est_travel}px avant atterrissage.
-Devant: ennemis=[{enemy_str}] | trou=[{hole_str}] | obstacle=[{pipe_str}]
+Atterrissage prédit : "far"=~{_est_travel}px | "short"=~{_short_land_px}px
+Situation actuelle : ennemis=[{enemy_str}] | trou=[{hole_str}] | obstacle=[{pipe_str}]
 
-RÈGLE : si un ennemi est à une distance < {_est_travel}px, Mario va ATTERRIR DESSUS → choisir "far" (sauter par-dessus) ou "stop"/"left" (éviter).
-Si aucun danger dans les {_est_travel}px → "far" (continuer normalement).
+PRÉDICTIONS AU MOMENT DE L'ATTERRISSAGE :
+  "far"   → atterrit à ~{mario_x + _est_travel}px : {_fmt(_pred_far)}
+  "short" → atterrit à ~{mario_x + _short_land_px}px : {_fmt(_pred_short)}
+
+{_conseil}
 
 Choisis l'atterrissage:
-- "far"   → continuer right+A+B (atterrir loin, dépasse l'ennemi)
-- "short" → relâcher A maintenant (tomber court, atterrir AVANT un trou/ennemi)
-- "left"  → virer à gauche (danger immédiat devant, reculer)
-- "stop"  → chute verticale (ennemi pile en dessous à atterrir dessus)
+- "far"   → continuer right+A+B (atterrir loin ~{_est_travel}px)
+- "short" → relâcher A (atterrir court ~{_short_land_px}px)
+- "left"  → virer à gauche (danger immédiat devant)
+- "stop"  → chute verticale (stomp si ennemi pile dessous)
 
 JSON uniquement: {{"landing":"<choix>"}}"""
 
@@ -2797,9 +2945,7 @@ JSON uniquement: {{"landing":"<choix>"}}"""
 
             actions = self.parse_claude_actions(response_text)
             if not actions:
-                # API a échoué ou retourné vide : fallback run_jump_over pour passer l'obstacle
-                actions = [{'macro_name': 'run_jump_over', 'reasoning': 'SCENE SYNC fallback', 'urgency': 9}]
-                print(" SCENE SYNC: fallback run_jump_over (API sans réponse)")
+                print(" SCENE SYNC: API sans réponse, pas d'action automatique (Claude décidera au prochain cycle)")
             _mario_speed = situation.get('mario', {}).get('speed', 1)
             for action in actions:
                 if len(self.action_queue) < 5:
@@ -2837,7 +2983,7 @@ JSON uniquement: {{"landing":"<choix>"}}"""
             _macro_counts[m] = _macro_counts.get(m, 0) + 1
         _summary = ', '.join(f"{m}×{c}" for m, c in _macro_counts.items())
         _jump_tried = set(failed_macros)
-        _jump_all = ['max_jump', 'pipe_jump', 'obstacle_jump', 'run_jump_over']
+        _jump_all = ['max_jump', 'pipe_vertical_jump', 'high_obstacle_jump']
         _jump_not_tried = [j for j in _jump_all if j not in _jump_tried]
         _alternatives = (f"Sauts non encore essayés : {', '.join(_jump_not_tried)}"
                          if _jump_not_tried else
@@ -2853,16 +2999,16 @@ Delta x à chaque essai : < 40px (Mario revient au point de départ)
 {_alternatives}
 
 ANALYSE : Quel est cet obstacle ? Est-il franchissable par le dessus ?
-- Si tuyau haut → pipe_jump (approche lente + saut max)
+- Si tuyau haut → utilise step_back PUIS pipe_jump (reculer d'abord pour prendre de l'élan AVANT le tuyau!)
 - Si plateforme large → obstacle_jump (élan 20f + saut max)
 - Si l'obstacle est une sortie/destination → pipe_down ou autre approche
-- Si vraiment bloqué → step_back pour reculer et tenter avec plus d'élan
+- STRATÉGIE CLEF si tous les sauts directs ont échoué : step_back (reculer ~60px par défaut, ou step_back px=80 pour plus d'élan) pour s'éloigner du bord, PUIS pipe_jump avec élan complet
 
 ACTIONS DÉJÀ ÉCHOUÉES (à éviter) : {_summary}
 
 Donne 2-3 actions différentes pour passer cet obstacle.
 JSON UNIQUEMENT :
-{{"actions":[{{"macro_action":"pipe_jump"}},{{"macro_action":"step_back"}}],"urgency":8}}"""
+{{"actions":[{{"macro_action":"step_back"}},{{"macro_action":"pipe_jump"}}],"urgency":8}}"""
 
         actions = self.parse_claude_actions(self.call_claude_for_macro(prompt, obs=obs))
         if actions:
@@ -2890,8 +3036,8 @@ JSON UNIQUEMENT :
 
         # Identifier quels types de sauts ont déjà été essayés
         _failed_set = set(failed_actions)
-        _jump_tried = [j for j in ['max_jump', 'pipe_jump', 'obstacle_jump', 'run_jump_over'] if j in _failed_set]
-        _jump_not_tried = [j for j in ['pipe_jump', 'obstacle_jump', 'max_jump'] if j not in _failed_set]
+        _jump_tried = [j for j in ['max_jump', 'pipe_jump', 'pipe_vertical_jump', 'obstacle_jump', 'high_obstacle_jump', 'run_jump_over'] if j in _failed_set]
+        _jump_not_tried = [j for j in ['pipe_jump', 'pipe_vertical_jump', 'high_obstacle_jump', 'obstacle_jump', 'max_jump'] if j not in _failed_set]
         _jump_escalation = ""
         if _jump_tried:
             _jump_escalation = f"\n SAUTS DÉJÀ ESSAYÉS SANS SUCCÈS: {', '.join(_jump_tried)}"
@@ -2948,62 +3094,151 @@ ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
 
         # Sauvegarder l'état NES juste avant un saut — utilisé pour le rewind fell_in_hole
         # (permet de restaurer Mario au sol, avant le saut fatal, sans replay problématique)
-        _PRE_JUMP_MACROS = {'pipe_jump', 'obstacle_jump', 'max_jump', 'run_jump_over',
-                            'big_jump_right', 'short_jump', 'long_jump', 'high_jump', 'precise_jump'}
+        _PRE_JUMP_MACROS = {'pipe_jump', 'obstacle_jump', 'high_obstacle_jump', 'pipe_vertical_jump',
+                            'max_jump', 'run_jump_over', 'big_jump_right', 'short_jump', 'long_jump',
+                            'high_jump', 'precise_jump'}
 
         # Nouveau saut : reset mid-air + seuils de détection pour CE saut.
-        # Sans ça, si les seuils ennemis {180,100,50} étaient déjà épuisés avant le saut,
-        # aucune re-détection ne se déclenche pendant toute la durée du saut → mort garantie.
         if macro_name in _PRE_JUMP_MACROS:
             self._mid_air_called = False
             self._mid_air_emergency_called = False
-            self._enemy_thresholds_hit.clear()
-            self._scene_active = False  # Permettre re-déclenchement scène pendant le saut
+            # Pré-remplir les seuils ennemis déjà franchis au moment du saut.
+            # Ne pas vider complètement : le même ennemi re-déclencherait immédiatement
+            # sur la frame suivante (boucle infinie CLEAR+SYNC → run_jump_over jamais exécuté).
+            # On marque comme "déjà vus" tous les seuils que la distance actuelle a dépassés.
+            # Un NOUVEL ennemi (distance passe de <15 à >40) vide les seuils via check_scene_thresholds.
+            _cur_ed = self._last_known_enemy_dist
+            if _cur_ed is not None:
+                _all_enemy_t = set(self._get_level_thresholds().get('enemy', []))
+                self._enemy_thresholds_hit = {t for t in _all_enemy_t if _cur_ed <= t}
+            # else : pas d'ennemi connu → laisser les seuils tels quels
+            self._scene_active = False  # Permettre re-déclenchement pour UN NOUVEL ennemi
             self._new_enemy_appeared = False  # Reset au départ du saut
         if macro_name in _PRE_JUMP_MACROS:
             try:
                 _ram_now = self.env.unwrapped._ram_buffer()
+                # Détection "collé au tuyau" (jump→jump sans avancer) :
+                # Si le saut précédent n'a pas avancé Mario de 10px, on compte un échec.
+                # Seuil 10px (et non 40px) pour éviter les faux positifs sur plateformes en escalier
+                # où Mario saute de plateforme en plateforme avec ~20-35px d'avance par saut.
+                # Au 2e échec consécutif dans la même zone : step_back injecté avant ce saut.
+                _new_jump_x = int(_ram_now[0x6D]) * 256 + int(_ram_now[0x86])
+                if self._pre_jump_ram is not None:
+                    _pipe_advance = _new_jump_x - self._pre_jump_x
+                    if _pipe_advance < 10:
+                        _jbucket_pipe = int(max(self._pre_jump_x, 0) // 50) * 50
+                        if _jbucket_pipe not in self._failed_jump_attempts:
+                            self._failed_jump_attempts[_jbucket_pipe] = []
+                        self._failed_jump_attempts[_jbucket_pipe].append(macro_name)
+                        _n_pipe_fails = len(self._failed_jump_attempts[_jbucket_pipe])
+                        self.logger.log_queue_event("JUMP_FAIL", getattr(self, '_current_step', 0),
+                            f"jump→jump advance={_pipe_advance:.0f}px bucket={_jbucket_pipe} n={_n_pipe_fails}")
+                        if _n_pipe_fails >= 2:
+                            self._failed_jump_attempts.pop(_jbucket_pipe, None)
+                            self.action_queue.appendleft(macro_decision)
+                            self.action_queue.appendleft({'macro_name': 'step_back'})
+                            self.logger.log_queue_event("STUCK ", getattr(self, '_current_step', 0),
+                                f"pipe stuck x={_new_jump_x} → step_back + {macro_name}")
+                            print(f"Pipe stuck ({_n_pipe_fails}x sans avancer 10px) → step_back + {macro_name}")
+                            return  # step_back prend la main, saut rejoué ensuite
                 self._pre_jump_ram = _ram_now.copy()
                 # Lire x_pos directement depuis la RAM NES (évite la staleness de last_situation)
                 # Formule gym-super-mario-bros : RAM[0x6D]*256 + RAM[0x86]
                 self._pre_jump_x = int(_ram_now[0x6D]) * 256 + int(_ram_now[0x86])
                 self._pre_jump_y = int(_ram_now[0x03])  # RAM 0x03 = y_pos NES
                 self._pre_jump_history_len = len(self._final_action_history)
+                # Backup complet (CPU+PPU) pour restore exact sans rejouer dans le trou
+                self.env.unwrapped._backup()
+                self._pre_jump_has_full_backup = True
+                # Invalider les checkpoints rewind buffer (slot unique écrasé)
+                for _cp in self.rewind_buffer:
+                    _cp['has_full_backup'] = False
             except Exception:
+                self._pre_jump_has_full_backup = False
                 if self.last_situation:
                     self._pre_jump_x = self.last_situation['mario']['x']
                     self._pre_jump_y = self.last_situation['mario']['y']
 
         px = macro_decision.get('px')
 
-        # Conversion run_jump_over → pipe_jump si déjà tenté au même endroit (±40px).
-        # run_jump_over (saut horizontal) se coince contre les tuyaux hauts.
-        # Même logique que stomp_enemy → run_jump_over : défense côté code, pas côté LLM.
         if macro_name == 'run_jump_over':
-            _cur_x = getattr(self, '_pre_jump_x', -999)
-            if abs(_cur_x - self._last_run_jump_over_x) < 40:
-                print(f"run_jump_over x={_cur_x} deja tente → pipe_jump")
-                macro_name = 'pipe_jump'
-                macro_decision = dict(macro_decision, macro_name='pipe_jump')
-                macro_config = self.macro_actions['pipe_jump']  # MAJ config obligatoire
+            # px = distance du saut (obligatoire), approach_px = course avant saut (optionnel)
+            _jump_px = px if px is not None else 40
+            _approach_px = macro_decision.get('approach_px', 0) or 0
+            approach_frames = max(0, round(int(_approach_px) / 2))
+            jump_frames = max(10, min(40, round((int(_jump_px) + 10) / 3)))
+            # Guard : si ennemi dans la zone d'approche → saut immédiat
+            _enemy_dist_now = getattr(self, '_log_last_enemy_dist', None)
+            if approach_frames > 0 and _enemy_dist_now is not None and _enemy_dist_now > 0:
+                _max_safe = max(0, int((_enemy_dist_now - 30) / 5))
+                if approach_frames > _max_safe:
+                    print(f"run_jump_over approche réduite {approach_frames}f→0 (ennemi={_enemy_dist_now}px)")
+                    approach_frames = 0
+            if approach_frames == 0:
+                self.current_macro = {
+                    'name': macro_name,
+                    'base_action': 4,
+                    'frames_left': jump_frames,
+                    '_initial_frames': jump_frames,
+                    'decision': macro_decision
+                }
             else:
-                self._last_run_jump_over_x = _cur_x
+                self.current_macro = {
+                    'name': macro_name,
+                    'phases': [
+                        {'base_action': 3, 'duration': approach_frames},
+                        {'base_action': 4, 'duration': jump_frames}
+                    ],
+                    'current_phase': 0,
+                    'base_action': 3,
+                    'frames_left': approach_frames,
+                    'decision': macro_decision
+                }
 
-        if macro_name == 'max_jump' and px is not None:
+        if macro_name == 'max_jump' and px is None:
+            # max_jump SANS px = saut direct court (ennemi proche, pas d'approche)
+            # Durée fixe 20 frames = ~60px horizontal. MID-AIR peut raccourcir à 8f si besoin.
+            self.current_macro = {
+                'name': macro_name,
+                'base_action': 4,
+                'frames_left': 20,
+                '_initial_frames': 20,
+                'decision': macro_decision
+            }
+        elif macro_name == 'max_jump' and px is not None:
             # max_jump avec px = approche N pixels vers la droite puis saut max
             # Transformé en 2 phases : phase1=run_right(approach_frames), phase2=max_jump(40f)
             approach_frames = max(3, min(80, round(int(px) / 2)))
-            self.current_macro = {
-                'name': macro_name,
-                'phases': [
-                    {'base_action': 3, 'duration': approach_frames},  # run right (B held)
-                    {'base_action': 4, 'duration': 40}  # right+A+B max jump
-                ],
-                'current_phase': 0,
-                'base_action': 3,
-                'frames_left': approach_frames,
-                'decision': macro_decision
-            }
+            # Guard : si un ennemi est dans la zone d'approche → saut immédiat sans approche
+            _enemy_dist_now = getattr(self, '_log_last_enemy_dist', None)
+            if _enemy_dist_now is not None and _enemy_dist_now > 0:
+                _max_safe_approach = max(0, int((_enemy_dist_now - 30) / 5))
+                if approach_frames > _max_safe_approach:
+                    print(f"max_jump approche réduite {approach_frames}f→0 (ennemi={_enemy_dist_now}px, saut immédiat)")
+                    approach_frames = 0
+            if approach_frames == 0:
+                # Saut direct — px = distance à couvrir → durée = px / 3px/frame, min 15f, max 40f
+                jump_frames = max(15, min(40, round((int(px) + 10) / 3)))
+                print(f"max_jump saut direct {jump_frames}f pour couvrir {px+10}px ({px}px+10 marge)")
+                self.current_macro = {
+                    'name': macro_name,
+                    'base_action': 4,
+                    'frames_left': jump_frames,
+                    '_initial_frames': jump_frames,
+                    'decision': macro_decision
+                }
+            else:
+                self.current_macro = {
+                    'name': macro_name,
+                    'phases': [
+                        {'base_action': 3, 'duration': approach_frames},  # run right (B held)
+                        {'base_action': 4, 'duration': 40}  # right+A+B max jump
+                    ],
+                    'current_phase': 0,
+                    'base_action': 3,
+                    'frames_left': approach_frames,
+                    'decision': macro_decision
+                }
         elif macro_name == 'stomp_enemy':
             # Smart stomp : courir vers l'ennemi, sauter automatiquement quand OAM < seuil.
             # Sans px : approche longue (200f), le smart stomp OAM déclenche le saut.
@@ -3030,6 +3265,15 @@ ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
             # pipe_jump/obstacle_jump avec px = distance d'approche avant le saut
             # Claude contrôle combien de frames courir avant de sauter
             approach_frames = max(3, min(80, round(int(px) / 2)))
+            # Sécurité : si un ennemi est dans la zone d'approche, raccourcir l'élan.
+            # Taux de fermeture ~5px/frame (Mario 3px/f + Goomba 2px/f).
+            # On veut garder ≥30px de marge au moment du saut → max_safe = (dist-30)/5.
+            _enemy_dist_now = getattr(self, '_log_last_enemy_dist', None)
+            if _enemy_dist_now is not None and _enemy_dist_now > 0:
+                _max_safe_approach = max(0, int((_enemy_dist_now - 30) / 5))
+                if approach_frames > _max_safe_approach:
+                    print(f"pipe_jump approche réduite {approach_frames}f→0 (ennemi={_enemy_dist_now}px, saut immédiat avec élan actuel)")
+                    approach_frames = 0  # Saut immédiat — vitesse de l'action précédente (~3px/f), meilleur que approche partielle
             self.current_macro = {
                 'name': macro_name,
                 'phases': [
@@ -3041,14 +3285,30 @@ ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
                 'frames_left': approach_frames,
                 'decision': macro_decision
             }
+        elif macro_name == 'step_back':
+            # Recul vers la gauche. Vitesse ≈ 3px/frame.
+            # Claude peut fournir px = distance souhaitée, sinon durée par défaut (20f = ~60px).
+            if px is not None:
+                frames = max(5, min(100, round(int(px) / 3)))
+            else:
+                frames = macro_config['duration']  # 20 frames par défaut
+            self.current_macro = {
+                'name': macro_name,
+                'base_action': macro_config['base_action'],
+                'frames_left': frames,
+                '_initial_frames': frames,
+                'decision': macro_decision
+            }
         elif 'phases' in macro_config:
             # Macro multi-phases : phase 1 d'abord (px ignoré → durée config par défaut)
+            _ph0_dur = macro_config['phases'][0]['duration']
             self.current_macro = {
                 'name': macro_name,
                 'phases': macro_config['phases'],
                 'current_phase': 0,
                 'base_action': macro_config['phases'][0]['base_action'],
-                'frames_left': macro_config['phases'][0]['duration'],
+                'frames_left': _ph0_dur,
+                '_initial_frames': _ph0_dur,  # requis pour _enough_airtime dans LAND detection
                 'decision': macro_decision
             }
         else:
@@ -3103,7 +3363,19 @@ ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
         if self.current_macro and self.current_macro['frames_left'] > 0:
             # Continuer la macro en cours
             self.current_macro['frames_left'] -= 1
-            return self.current_macro['base_action']
+            action = self.current_macro['base_action']
+            # Dernière frame d'un saut : relâcher A pour garantir le front montant
+            # du saut suivant. NES exige release+press ; sans ça, le 2e saut ne part pas.
+            _JUMP_MACROS_LOCAL = {'pipe_jump', 'obstacle_jump', 'high_obstacle_jump',
+                                  'pipe_vertical_jump', 'max_jump', 'run_jump_over',
+                                  'big_jump_right', 'short_jump', 'long_jump',
+                                  'high_jump', 'precise_jump'}
+            if (self.current_macro['frames_left'] == 0 and
+                    self.current_macro.get('name') in _JUMP_MACROS_LOCAL and
+                    action in {2, 4}):
+                action = 3 if action == 4 else 1  # strip A
+                self._a_release_frames = 0  # LAND ne devra pas rajouter de délai
+            return action
         else:
             # Phase terminée — vérifier s'il y a une phase suivante (multi-phases)
             if self.current_macro and 'phases' in self.current_macro:
@@ -4143,13 +4415,21 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                 'total': len(self._final_action_history),
                 'world': world,
                 'level': level}
-        if self._perfect_start_ram is not None and self._rewind_index is not None:
-            data['start_ram'] = base64.b64encode(self._perfect_start_ram.tobytes()).decode()
-            data['start_x'] = self._perfect_start_x
-            data['rewind_index'] = self._rewind_index
+        if self._rewind_checkpoints:
+            data['rewind_checkpoints'] = [
+                {'index': c['index'],
+                 'ram': base64.b64encode(c['ram'].tobytes()).decode(),
+                 'x': c['x']}
+                for c in self._rewind_checkpoints
+            ]
+            # Compat ancien format : dernier checkpoint = start_ram/start_x/rewind_index
+            last = self._rewind_checkpoints[-1]
+            data['start_ram'] = base64.b64encode(last['ram'].tobytes()).decode()
+            data['start_x'] = last['x']
+            data['rewind_index'] = last['index']
         with open(path, 'w') as f:
             json.dump(data, f, default=lambda o: int(o) if hasattr(o, 'item') else str(o))
-        rewind_info = f" (depuis rewind x={self._perfect_start_x})" if self._perfect_start_ram is not None else ""
+        rewind_info = f" ({len(self._rewind_checkpoints)} rewind(s))" if self._rewind_checkpoints else ""
         print(f" Run parfait {world}-{level} sauvegardé : {len(self._final_action_history)} actions{rewind_info} → {path}")
 
     def play_perfect_replay(self):
@@ -4187,24 +4467,39 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         with open(chosen) as f:
             data = json.load(f)
         actions = data['actions']
-        rewind_index = data.get('rewind_index')  # None si pas de rewind dans ce run
-        start_ram_b64 = data.get('start_ram')
-        start_x = data.get('start_x', '?')
 
-        if rewind_index is not None and not start_ram_b64:
+        # Construire la table des checkpoints à restaurer pendant le replay.
+        # Nouveau format : rewind_checkpoints (liste triée par index).
+        # Ancien format (compat) : rewind_index + start_ram.
+        _raw_checkpoints = data.get('rewind_checkpoints')
+        if _raw_checkpoints:
+            checkpoints = {c['index']: (c['ram'], c['x']) for c in _raw_checkpoints}
+        elif data.get('rewind_index') is not None and data.get('start_ram'):
+            checkpoints = {data['rewind_index']: (data['start_ram'], data.get('start_x', '?'))}
+        else:
+            checkpoints = {}
+
+        if checkpoints and not _raw_checkpoints:
+            # Ancien format sans snapshot RAM valide déjà vérifié plus haut
+            pass
+        # Vérifier ancien format sans RAM
+        if data.get('rewind_index') is not None and not data.get('start_ram') and not _raw_checkpoints:
             print(f"  Ce replay a été généré avec une version incomplète du code (pas de snapshot RAM).")
             print(f"    → Lancez une nouvelle partie et réessayez option 3.")
             return
 
         replay_world = data.get('world') or 1
         replay_level = data.get('level') or 1
-        rewind_info = f" (rewind à x={start_x}, index={rewind_index})" if rewind_index is not None else ""
+        rewind_info = f" ({len(checkpoints)} rewind(s))" if checkpoints else ""
         print(f"▶  Replay parfait World {replay_world}-{replay_level} : {len(actions)} actions{rewind_info} (ESC pour arrêter)")
 
         env_id = f'SuperMarioBros-{replay_world}-{replay_level}-v3'
         env = gym_super_mario_bros.make(env_id)
         env = JoypadSpace(env, SIMPLE_MOVEMENT)
         obs = env.reset()
+
+        # Index du dernier checkpoint pour l'affichage
+        _last_cp_index = max(checkpoints.keys()) if checkpoints else None
 
         cv2.namedWindow('Mario — Replay Parfait', cv2.WINDOW_AUTOSIZE)
 
@@ -4215,7 +4510,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             display = cv2.resize(frame, (600, 480), interpolation=cv2.INTER_NEAREST)
             pct = int(100 * i / len(actions))
             cv2.rectangle(display, (0, 0), (int(6 * pct), 6), (0, 255, 100), -1)
-            label = "PRE-REWIND" if (rewind_index and i < rewind_index) else "REPLAY PARFAIT"
+            label = "PRE-REWIND" if (_last_cp_index and i < _last_cp_index) else "REPLAY PARFAIT"
             cv2.putText(display, f"{label}  {pct}%  x={info.get('x_pos', 0)}",
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
             cv2.imshow('Mario — Replay Parfait', display)
@@ -4224,14 +4519,19 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 
         interrupted = False
         for i, action in enumerate(actions):
-            # Au point de rewind : restaurer la RAM NES pour corriger le timing des ennemis
-            if i == rewind_index and start_ram_b64:
-                ram_bytes = base64.b64decode(start_ram_b64)
+            # Restaurer la RAM NES à chaque checkpoint enregistré
+            if i in checkpoints:
+                ram_b64, cp_x = checkpoints[i]
+                ram_bytes = base64.b64decode(ram_b64)
                 ram_array = np.frombuffer(ram_bytes, dtype=np.uint8).copy()
                 env.unwrapped.done = False
                 np.copyto(env.unwrapped._ram_buffer(), ram_array)
-                obs, _, _, _ = env.step(0)  # NOOP pour rafraîchir
-                print(f"⏪ RAM restaurée au checkpoint x={start_x} (timing ennemis corrigé)")
+                # 30 NOOPs identiques au jeu original (resynchroniser PPU + timing ennemis)
+                for _ in range(30):
+                    env.unwrapped.done = False
+                    obs, _, _, _ = env.step(0)
+                env.unwrapped.done = False
+                print(f"⏪ RAM restaurée + 30 NOOPs → checkpoint x={cp_x} (index={i})")
 
             done, info, key = _step_and_show(action, i)
             if key == 27:  # ESC
@@ -4514,6 +4814,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 print(f"Déclenchement Claude ({trigger_reason}) - thinking:{self.claude_thinking}, queue:{len(self.action_queue)}, step:{step_count}")
                                 self.logger.log_queue_event("CALL  ", step_count,
                                     f"async queue-vide | x={_seg_x} macro={self.current_macro['name'] if self.current_macro else None}")
+                                self._last_call_reason = "queue-vide"
                                 self.call_claude_async(situation, obs, step_count)
 
                             # File vide : pause ou replay selon le contexte
@@ -4536,7 +4837,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                         print("⏸  File vide — en attente d'instructions...")
                                         self._pause_printed = True
                                         self.logger.log_queue_event("PAUSE ", step_count,
-                                            f"début pause | macro={self.current_macro['name'] if self.current_macro else None} thinking={self.claude_thinking}")
+                                            f"début pause | reason={getattr(self, '_last_call_reason', '?')} | macro={self.current_macro['name'] if self.current_macro else None} thinking={self.claude_thinking}")
                             else:
                                 if getattr(self, '_pause_printed', False):
                                     # Reprise après pause
@@ -4552,9 +4853,44 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     _prev_frame_macro = self._prev_macro_name  # macro active au frame précédent
                     current_macro_name = self.current_macro['name'] if self.current_macro else None
                     self._prev_macro_name = current_macro_name
-                    _JUMP_MACROS = {'stomp_enemy', 'pipe_jump', 'obstacle_jump',
-                                    'max_jump', 'run_jump_over', 'big_jump_right',
+                    _JUMP_MACROS = {'stomp_enemy', 'pipe_jump', 'obstacle_jump', 'high_obstacle_jump',
+                                    'pipe_vertical_jump', 'max_jump', 'run_jump_over', 'big_jump_right',
                                     'short_jump', 'long_jump', 'high_jump', 'precise_jump'}
+
+                    # Anti-mur : si Mario presse droite SANS A (approche/course) et que x_pos
+                    # n'a pas bougé depuis ≥3 frames → collé à un obstacle → recul actif.
+                    # Actions sans A : 1 (right), 3 (right+B). Actions avec A : 2, 4 → saut réel,
+                    # on ne touche pas (sinon on coupe le saut).
+                    # Après détection : 3 frames de LEFT (~2px de recul) pour dégager le tuyau.
+                    _RIGHT_NO_JUMP = {1, 3}   # droite sans bouton A
+                    _JUMP_ACTIONS  = {2, 4}   # droite + A (phase saut active)
+                    _wall_backing = getattr(self, '_wall_backing_frames', 0)
+                    if _wall_backing > 0 and current_action not in _JUMP_ACTIONS:
+                        # Recul actif en cours — appliquer LEFT sauf si saut en cours
+                        current_action = 6  # left
+                        self._wall_backing_frames = _wall_backing - 1
+                        self._wall_stuck_frames = 0
+                    elif current_action in _RIGHT_NO_JUMP and _seg_x > 0:
+                        if _seg_x == getattr(self, '_wall_x_prev', -1):
+                            self._wall_stuck_frames = getattr(self, '_wall_stuck_frames', 0) + 1
+                            if self._wall_stuck_frames >= 3:
+                                # Collé → déclencher 3 frames de recul
+                                self._wall_backing_frames = 3
+                                self._wall_stuck_frames = 0
+                                current_action = 6  # left : première frame du recul
+                        else:
+                            self._wall_stuck_frames = 0
+                            self._wall_backing_frames = 0
+                    elif current_action not in _JUMP_ACTIONS:
+                        self._wall_stuck_frames = 0
+                    self._wall_x_prev = _seg_x
+
+                    # NES A-button rising edge : après un LAND, on strip A pendant 2 frames
+                    # pour que le saut suivant parte vraiment (relâcher puis presser).
+                    if current_action is not None and getattr(self, '_a_release_frames', 0) > 0:
+                        if current_action in {2, 4}:
+                            current_action = 3 if current_action == 4 else 1
+                        self._a_release_frames -= 1
 
                     # Exécuter l'action dans le jeu
                     done = False  # valeur par défaut quand env.step() n'est pas appelé (pause)
@@ -4574,12 +4910,16 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         self.segment_memory.record_position(_seg_x, step_count)
 
                         #  TRACKING SAUTS ÉCHOUÉS
-                        # Détecter quand un saut vient de se terminer (transition macro → non-saut).
-                        # Si le delta x < 40px, l'obstacle n'a pas été franchi → tentative échouée.
-                        _jump_track_set = {'pipe_jump', 'obstacle_jump', 'max_jump', 'run_jump_over',
-                                           'big_jump_right', 'short_jump', 'long_jump', 'high_jump', 'precise_jump'}
-                        if (_prev_frame_macro in _jump_track_set and
-                                (current_macro_name is None or current_macro_name not in _jump_track_set)):
+                        # Détecter quand un saut OBSTACLE vient de se terminer.
+                        # On exclut run_jump_over (ennemi, pas obstacle) : il n'échoue pas
+                        # face à un tuyau, il passe juste par-dessus un ennemi.
+                        # La condition ne requiert plus que la macro suivante soit non-saut :
+                        # URGENCE SOL peut enchaîner immédiatement run_jump_over après pipe_jump
+                        # (run_jump_over est dans _jump_track_set), ce qui faisait rater le JUMP_FAIL.
+                        _obstacle_track_set = {'pipe_jump', 'obstacle_jump', 'high_obstacle_jump',
+                                               'pipe_vertical_jump', 'max_jump', 'big_jump_right', 'long_jump'}
+                        if (_prev_frame_macro in _obstacle_track_set and
+                                current_macro_name != _prev_frame_macro):
                             _jump_x_delta = _seg_x - self._pre_jump_x
                             _jbucket = int(self._pre_jump_x // 50) * 50  # aligné avec _blocked_macros_by_pos
                             if _jump_x_delta < 40:
@@ -4599,18 +4939,29 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                         self._failed_jump_attempts[_jbucket],
                                         self._pre_jump_x, _seg_x, obs, step_count)
                                     self._failed_jump_attempts.pop(_jbucket, None)
-                            elif _seg_x > _jbucket + 60:
+                            elif _seg_x > _jbucket + 100 and _prev_frame_macro != 'run_jump_over':
                                 # Saut vraiment réussi : Mario est bien au-delà du bucket de départ.
-                                # Seuil 80px (> largeur bucket 30px) pour éviter qu'un saut ennemi
-                                # (URGENCE SOL, delta=40-70px) n'efface les échecs d'obstacle.
+                                # Seuil 100px ET on exclut run_jump_over (ennemi, pas obstacle) :
+                                # un saut ennemi peut déplacer Mario de 60-80px sans franchir le tuyau,
+                                # ce qui effacerait les échecs d'obstacle et empêcherait l'obstacle_retry.
                                 self._failed_jump_attempts.pop(_jbucket, None)
 
                         #  Checkpoint rewind (toutes les 60 frames)
                         # Ne pas sauvegarder si done=True (frame de mort) — checkpoint invalide
                         if step_count % 60 == 0 and not self._rewind_active and not done:
+                            # Sauvegarde état complet émulateur (CPU + PPU VRAM) — 1 seul slot.
+                            # Écrase le backup précédent ; seul le checkpoint le plus récent
+                            # bénéficie du restore complet (pas de décor fantôme).
+                            self.env.unwrapped._backup()
+                            # Le slot est maintenant le checkpoint 60f → le backup pré-saut
+                            # n'est plus valide (même slot écrasé).
+                            self._pre_jump_has_full_backup = False
                             _ram_snap = self.env.unwrapped._ram_buffer().copy()
                             _recent_macros = [m['name'] for m in list(self.macro_history)[-8:]]
                             _cp_y = real_info.get('y_pos', 200)
+                            # Marquer les anciens checkpoints : backup slot écrasé
+                            for _old in self.rewind_buffer:
+                                _old['has_full_backup'] = False
                             self.rewind_buffer.append({
                                 'step': step_count,
                                 'ram': _ram_snap,
@@ -4619,6 +4970,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 'macros': _recent_macros,
                                 'action_history': list(self._raw_action_history),
                                 'perfect_history_len': len(self._final_action_history),
+                                'has_full_backup': True,
                             })
                             self.logger.log_game_event("REWIND_CHECKPOINT", step_count, {
                                 "x_pos": int(_seg_x), "buffer_size": len(self.rewind_buffer),
@@ -4755,8 +5107,14 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         self.current_macro.get('current_phase', 0) == 0 and
                         len(self.current_macro.get('phases', [])) > 1  # multi-phase = a une approche
                     )
+                    # Vérifie si Mario est physiquement en l'air (y_pos < 180).
+                    # Évite les faux positifs : rebond sur ennemi, LAND prématuré, etc.
+                    # Fallback True si real_info pas encore disponible (début de session).
+                    _mario_y_physics = real_info.get('y_pos', 0) if 'real_info' in locals() else 0
+                    _actually_airborne = (_mario_y_physics < 180) if _mario_y_physics > 0 else True
                     _currently_jumping = (current_macro_name in _JUMP_MACROS and
-                                          not _in_approach_phase)
+                                          not _in_approach_phase and
+                                          _actually_airborne)
 
                     # Détecter atterrissage physique : macro de saut encore active mais Mario au sol.
                     # Double détection : y_pos >= 185 (RAM) ET pixels sous les pieds (OAM+image).
@@ -4777,24 +5135,39 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         _elapsed_fl = _initial_fl - _fl_remaining
                         _enough_airtime = _elapsed_fl >= 15
                         _grounded_y = _enough_airtime and _mario_y_now >= 185
-                        _grounded_px = _enough_airtime and self._mario_is_grounded(obs if 'obs' in locals() else None)
-                        if _grounded_y or _grounded_px:
+                        # Delta y_pos : si y ne change plus depuis 1 frame → Mario posé sur surface.
+                        # Plus fiable que la détection pixel (décors, tuiles de fond, etc.).
+                        _prev_y_land = getattr(self, '_prev_y_for_land', -1)
+                        _grounded_delta = (_enough_airtime and
+                                           _mario_y_now > 0 and
+                                           _mario_y_now == _prev_y_land)
+                        self._prev_y_for_land = _mario_y_now
+                        if _grounded_y or _grounded_delta:
                             self.current_macro['frames_left'] = 0
                             _currently_jumping = False
-                            _method = 'y_pos' if _grounded_y else 'pixels'
+                            _method = 'y_pos' if _grounded_y else ('delta_y' if _grounded_delta else 'pixels')
                             self.logger.log_queue_event("LAND  ", step_count,
-                                f"Atterrissage [{_method}] y={_mario_y_now} fl={_fl_remaining} | macro={current_macro_name} → fin macro")
+                                                        f"Atterrissage [{_method}] y={_mario_y_now} fl={_fl_remaining} | macro={current_macro_name} → fin macro")
+                            # NES : le bouton A nécessite un front montant (relâcher puis presser).
+                            # Si un saut suivant est déjà en queue, ses premières frames presseront A
+                            # alors qu'il était encore pressé → Mario ne décolle pas.
+                            # On force 2 frames sans A pour garantir le front montant.
+                            self._a_release_frames = 1
 
                     # MID-AIR : consultation synchrone Claude pour décider de l'atterrissage
                     # Déclenché quand frames_left <= 30 (mi-saut, assez tôt pour réagir).
                     # Un second déclenchement d'urgence est possible si un ennemi OAM est
                     # détecté à < 40px pendant la descente (fl < 15), même si déjà appelé.
                     # Le jeu est gelé (current_action = None) pendant l'appel Claude.
+                    _mid_air_y_now = real_info.get('y_pos', 255) if 'real_info' in locals() else 255
+                    _mid_air_jump_height = self._pre_jump_y - _mid_air_y_now  # positif si Mario a monté
+
                     if _currently_jumping and self.current_macro is not None:
                         _fl_now = self.current_macro.get('frames_left', 0)
                         # Second déclenchement d'urgence : ennemi très proche pendant la descente.
                         # Une seule fois par saut (_mid_air_emergency_called) pour éviter la boucle infinie.
                         if (self._mid_air_called and not self._mid_air_emergency_called and
+                                current_macro_name != 'pipe_vertical_jump' and
                                 _fl_now < 15 and _fl_now > 3 and
                                 _not_replay_zone and obs is not None):
                             _oam_em = self.get_enemies_from_oam()
@@ -4803,27 +5176,50 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 self._mid_air_called = False
                                 self._mid_air_emergency_called = True  # Bloque tout second emergency
                                 self.logger.log_queue_event("MID-AIR", step_count,
-                                    f"EMERGENCY reset fl={_fl_now} ennemi à {_close_em[0]['distance_px']}px")
+                                                            f"EMERGENCY reset fl={_fl_now} ennemi à {_close_em[0]['distance_px']}px")
                         if _fl_now <= 30 and not self._mid_air_called:
                             if not _not_replay_zone:
                                 self.logger.log_queue_event("MID-AIR", step_count, f"SKIP replay_zone macro={current_macro_name} fl={_fl_now}")
                             elif obs is None:
                                 self.logger.log_queue_event("MID-AIR", step_count, f"SKIP obs=None macro={current_macro_name} fl={_fl_now}")
+                            elif _mid_air_excluded:
+                                self.logger.log_queue_event("MID-AIR", step_count, f"SKIP pipe macro={current_macro_name} pipe_in_snap={_pipe_in_snap} fl={_fl_now}")
+                            elif _mid_air_jump_height < 50:
+                                self.logger.log_queue_event("MID-AIR", step_count, f"SKIP height={_mid_air_jump_height:.0f}px<50 macro={current_macro_name} fl={_fl_now}")
                         elif _fl_now > 30 and not self._mid_air_called:
                             self.logger.log_queue_event("MID-AIR", step_count, f"en attente macro={current_macro_name} fl={_fl_now}")
-
+                    _pipe_in_snap = ('_snap' in locals() and _snap.get('pipe_dist') is not None)
+                    _mid_air_excluded = (current_macro_name in ('pipe_vertical_jump', 'pipe_jump') or
+                                         (current_macro_name == 'max_jump' and _pipe_in_snap))
                     if (_currently_jumping and
                             not self._mid_air_called and
                             self.current_macro is not None and
+                            not _mid_air_excluded and
+                            _mid_air_jump_height >= 50 and
                             self.current_macro.get('frames_left', 0) <= 30 and
                             _not_replay_zone and obs is not None):
                         self._mid_air_called = True
                         _fl = self.current_macro['frames_left']
                         _mx = real_info.get('x_pos', _seg_x) if 'real_info' in locals() else _seg_x
-                        current_action = None  # Gèle le jeu pendant l'appel
-                        self.current_macro['frames_left'] += 1  # Compenser le décrément déjà fait
-                        self.logger.log_queue_event("MID-AIR", step_count, f"CALL macro={current_macro_name} fl={_fl} x={_mx}")
-                        _landing = self.call_claude_landing_sync(obs, _mx, _fl, step_count)
+
+                        # Vérifier s'il y a une menace réelle à l'atterrissage.
+                        # Si aucun ennemi devant (OAM) et aucun trou détecté (snap),
+                        # la réponse optimale est toujours 'far' → pas besoin de pausent Claude.
+                        _snap_now = _snap if '_snap' in locals() else {}
+                        _oam_check = self.get_enemies_from_oam()
+                        _mid_air_enemy = any(0 < e['distance_px'] < 220 for e in _oam_check)
+                        _mid_air_hole  = _snap_now.get('hole_dist') is not None
+                        _mid_air_has_threat = _mid_air_enemy or _mid_air_hole
+
+                        if not _mid_air_has_threat:
+                            self.logger.log_queue_event("MID-AIR", step_count,
+                                f"SKIP no-threat → far | macro={current_macro_name} fl={_fl}")
+                            _landing = 'far'
+                        else:
+                            current_action = None  # Gèle le jeu pendant l'appel
+                            self.current_macro['frames_left'] += 1  # Compenser le décrément déjà fait
+                            self.logger.log_queue_event("MID-AIR", step_count, f"CALL macro={current_macro_name} fl={_fl} x={_mx} enemy={_mid_air_enemy} hole={_mid_air_hole}")
+                            _landing = self.call_claude_landing_sync(obs, _mx, _fl, step_count)
                         self.logger.log_queue_event("MID-AIR", step_count, f"LANDING={_landing}")
                         if _landing == 'short':
                             self.current_macro['base_action'] = 3  # right+B, relâche A → chute
@@ -4945,8 +5341,8 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 if _queue_has_avoidance and _new_enemy_mid_jump:
                                     # Nouvel ennemi apparu pendant le saut — l'action en queue
                                     # était planifiée pour l'ennemi précédent (déjà passé).
-                                    # Transition SEAMLESS : max_jump → run_jump_over (même base_action=4)
-                                    # Mario continue de sauter sans interruption, juste plus longtemps.
+                                    # Transition SEAMLESS : prolonger le saut avec max_jump (même base_action=4)
+                                    # Mario continue de sauter sans interruption.
                                     self.action_queue.clear()
                                     self.action_queue.append({
                                         'macro_name': 'run_jump_over',
@@ -4954,11 +5350,10 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                         'urgency': 9
                                     })
                                     # Terminer le macro courant dès le prochain frame
-                                    # (run_jump_over prend le relais sans coupure car base_action identique)
                                     if self.current_macro:
                                         self.current_macro['frames_left'] = 0
                                     self.logger.log_queue_event("SCAN  ", step_count,
-                                        f"NOUVEL ENNEMI mid-jump [{_change_reason}] → transition seamless run_jump_over")
+                                        f"NOUVEL ENNEMI mid-jump [{_change_reason}] → transition seamless max_jump")
                                     if not self.claude_thinking:
                                         _scene_trigger = True
                                     # Si claude_thinking, le flag seuil reste (déjà ajouté) → re-trigger quand libre
@@ -4972,32 +5367,43 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     _ground_urgent = (
                                         not _currently_jumping and
                                         (('ennemi' in _change_reason and _threat_dist < 60) or
-                                         (_is_hole_trigger and _threat_dist < 30))
+                                         (_is_hole_trigger and _threat_dist < 30) or
+                                         ('tuyau' in _change_reason and _threat_dist < 80))
                                     )
                                     if _ground_urgent:
-                                        # Le saut planifié était pour un obstacle déjà dépassé.
-                                        # Remplacer par la réaction à la menace actuelle.
-                                        _urgent_macro = 'max_jump' if _is_hole_trigger else 'run_jump_over'
+                                        # Menace urgente au sol → appel Claude sync (pas d'action automatique)
                                         self.action_queue.clear()
-                                        self.action_queue.append({
-                                            'macro_name': _urgent_macro,
-                                            'reasoning': f'Urgence sol [{_change_reason}]',
-                                            'urgency': 10
-                                        })
-                                        if self.current_macro and self.current_macro.get('name') not in _JUMP_MACROS:
-                                            self.current_macro['frames_left'] = 0
+                                        if self.current_macro:
+                                            _macro_is_jump = self.current_macro.get('name') in _JUMP_MACROS
+                                            if not _macro_is_jump or not _currently_jumping:
+                                                # Approche multi-phases (ex: pipe_jump phase 1, jump=False) :
+                                                # current_macro=None force le POP immédiat sans avancer à la phase saut.
+                                                self.current_macro = None
+                                        self._claude_generation += 1
+                                        self.claude_thinking = False
+                                        _scene_trigger = True
+                                        _scene_sync_needed = True
                                         self.logger.log_queue_event("SCAN  ", step_count,
-                                            f"URGENCE SOL [{_change_reason}] → {_urgent_macro} (dist={_threat_dist}px)")
+                                            f"URGENCE SOL [{_change_reason}] dist={_threat_dist}px → Claude sync")
                                     else:
-                                        # Seuil consommé mais aucune action prise → le restituer
-                                        # pour qu'il re-déclenche quand la queue sera libre.
-                                        if 'ennemi' in _change_reason:
-                                            for t in self._get_level_thresholds()['enemy']:
-                                                if f"seuil {t}px" in _change_reason:
-                                                    self._enemy_thresholds_hit.discard(t)
-                                                    break
-                                        self.logger.log_queue_event("SCAN  ", step_count,
-                                            f"BLOCKED avoidance [{_change_reason}] → seuil restitué")
+                                        # Seuil consommé mais aucune action prise → le restituer,
+                                        # sauf si déjà restitué dans les 10 derniers steps (anti-spam).
+                                        _rkey = ('avoidance', _change_reason[:40])
+                                        _rlast = self._threshold_restitution_steps.get(_rkey, -99)
+                                        if step_count - _rlast >= 10:
+                                            self._threshold_restitution_steps[_rkey] = step_count
+                                            if 'ennemi' in _change_reason:
+                                                for t in self._get_level_thresholds()['enemy']:
+                                                    if f"seuil {t}px" in _change_reason:
+                                                        self._enemy_thresholds_hit.discard(t)
+                                                        break
+                                            elif 'tuyau' in _change_reason:
+                                                for t in self._get_level_thresholds()['pipe']:
+                                                    if f"seuil {t}px" in _change_reason:
+                                                        self._pipe_thresholds_hit.discard(t)
+                                                        break
+                                            self.logger.log_queue_event("SCAN  ", step_count,
+                                                f"BLOCKED avoidance [{_change_reason}] → seuil restitué")
                                 elif not self.claude_thinking:
                                     _scene_trigger = True
                                     print(f" SCÈNE [{_change_reason}] → saut protégé, Claude prépare suite")
@@ -5007,9 +5413,13 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     # et relancer le trigger normal (PAUSE + appel Claude urgent).
                                     _bt_match = re.search(r'dist=(\d+)px', _change_reason)
                                     _bt_dist = int(_bt_match.group(1)) if _bt_match else 999
+                                    # Ne pas interrompre Claude si Mario est DÉJÀ en train de sauter
+                                    # (run_jump_over, max_jump…) : le macro en cours gère la menace.
+                                    # Exception : trou détecté en saut → peut nécessiter correction.
                                     _bt_urgent = (
-                                        ('ennemi' in _change_reason and _bt_dist < 50) or
-                                        (_is_hole_trigger and _bt_dist < 30)
+                                        (not _currently_jumping and 'ennemi' in _change_reason and _bt_dist < 50) or
+                                        (_is_hole_trigger and _bt_dist < 30) or
+                                        (not _currently_jumping and 'tuyau' in _change_reason and _bt_dist < 80)
                                     )
                                     if _bt_urgent:
                                         # Interrompre Claude, relancer avec contexte d'urgence
@@ -5017,20 +5427,32 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                         self.claude_thinking = False
                                         _scene_trigger = True
                                         _scene_sync_needed = True
-                                        if self.current_macro and self.current_macro.get('name') not in _JUMP_MACROS:
-                                            self.current_macro['frames_left'] = 0
+                                        if self.current_macro:
+                                            _macro_is_jump2 = self.current_macro.get('name') in _JUMP_MACROS
+                                            if not _macro_is_jump2 or not _currently_jumping:
+                                                self.current_macro = None
                                         self.action_queue.clear()
                                         self.logger.log_queue_event("SCAN  ", step_count,
                                             f"URGENCE thinking [{_change_reason}] dist={_bt_dist}px → Claude interrompu, relance")
                                     else:
-                                        # Menace lointaine : restituer le seuil pour re-trigger quand libre
-                                        if 'ennemi' in _change_reason:
-                                            for t in self._get_level_thresholds()['enemy']:
-                                                if f"seuil {t}px" in _change_reason:
-                                                    self._enemy_thresholds_hit.discard(t)
-                                                    break
-                                        self.logger.log_queue_event("SCAN  ", step_count,
-                                            f"BLOCKED thinking [{_change_reason}] → seuil restitué")
+                                        # Menace lointaine : restituer le seuil pour re-trigger quand libre,
+                                        # sauf si déjà restitué dans les 10 derniers steps (anti-spam).
+                                        _rkey2 = ('thinking', _change_reason[:40])
+                                        _rlast2 = self._threshold_restitution_steps.get(_rkey2, -99)
+                                        if step_count - _rlast2 >= 10:
+                                            self._threshold_restitution_steps[_rkey2] = step_count
+                                            if 'ennemi' in _change_reason:
+                                                for t in self._get_level_thresholds()['enemy']:
+                                                    if f"seuil {t}px" in _change_reason:
+                                                        self._enemy_thresholds_hit.discard(t)
+                                                        break
+                                            elif 'tuyau' in _change_reason:
+                                                for t in self._get_level_thresholds()['pipe']:
+                                                    if f"seuil {t}px" in _change_reason:
+                                                        self._pipe_thresholds_hit.discard(t)
+                                                        break
+                                            self.logger.log_queue_event("SCAN  ", step_count,
+                                                f"BLOCKED thinking [{_change_reason}] → seuil restitué")
                             elif not self._scene_active:
                                 self._scene_active = True
                                 self.last_oam_trigger_step = step_count
@@ -5042,7 +5464,8 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     _sc_dist = int(_sc_match.group(1)) if _sc_match else 999
                                     _sc_urgent = (
                                         ('ennemi' in _change_reason and _sc_dist < 50) or
-                                        (_is_hole_trigger and _sc_dist < 30)
+                                        (_is_hole_trigger and _sc_dist < 30) or
+                                        ('tuyau' in _change_reason and _sc_dist < 80)
                                     )
                                     if _sc_urgent:
                                         # Annuler l'appel en cours, relancer avec prompt urgent
@@ -5141,6 +5564,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         _why = (_change_reason if _scene_trigger and '_change_reason' in locals() else
                                 "queue basse" if _queue_trigger else
                                 "position +60px" if _position_trigger else "périodique 60f")
+                        self._last_call_reason = _why
                         trigger_type = " Initial" if not self.level_context_established else " Scan"
                         print(f" Déclenchement {trigger_type} [{_why}] - queue:{len(self.action_queue)}, step:{step_count}")
 
@@ -5182,6 +5606,16 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                             self.logger.log_queue_event("CALL  ", step_count,
                                 f"SYNC scene | oam={_oam_trigger} trou={_hole_trigger} pipe={_pipe_trigger}")
                             self.call_claude_scene_sync(situation, obs, step_count)
+                        elif _currently_jumping and _pipe_trigger and not _oam_trigger and not _hole_trigger:
+                            # Saut en cours, seul trigger = tuyau → inutile d'appeler Claude async :
+                            # le saut en cours gère déjà l'obstacle. Restituer le seuil pour
+                            # re-déclencher après l'atterrissage.
+                            for t in self._get_level_thresholds()['pipe']:
+                                if f"seuil {t}px" in _change_reason if '_change_reason' in locals() else False:
+                                    self._pipe_thresholds_hit.discard(t)
+                                    break
+                            self.logger.log_queue_event("CALL  ", step_count,
+                                f"SKIP async pipe-only jump={_currently_jumping} → seuil restitué post-atterrissage")
                         else:
                             self.logger.log_queue_event("CALL  ", step_count,
                                 f"async scene | oam={_oam_trigger} trou={_hole_trigger} pipe={_pipe_trigger} jump={_currently_jumping}")
@@ -5225,6 +5659,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                             self._raw_action_history.clear()
                             self._rewind_index = None
                             self._perfect_start_ram = None
+                            self._rewind_checkpoints = []
 
                             time.sleep(3)  # Pause pour admirer la victoire
 
@@ -5324,6 +5759,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                             'y_pos': int(self._pre_jump_y),
                                             'step': 0,
                                             'perfect_history_len': self._pre_jump_history_len,
+                                            'has_full_backup': getattr(self, '_pre_jump_has_full_backup', False),
                                         }
                                         print(f"⏪ Checkpoint pre-saut : x={self._pre_jump_x} (trou x={mario_x_death})")
                                     else:
@@ -5366,33 +5802,47 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 # Tronquer _final_action_history au niveau du checkpoint
                                 # (garde x=0→checkpoint, jette la branche morte checkpoint→mort).
                                 del self._final_action_history[_perfect_len:]
-                                self._rewind_index = _perfect_len
                                 _last_replay_info = {}
                                 _replay_succeeded = False  # Pas de replay — Mario repart du checkpoint
                                 if checkpoint_ram is not None:
-                                    # 1. Débloquer env.step() sans toucher au PPU
                                     self.env.unwrapped.done = False
-                                    # 2. Restaurer l'état NES exact du checkpoint (PPU préservé)
-                                    np.copyto(self.env.unwrapped._ram_buffer(), checkpoint_ram)
-                                    # 3. 30 NOOPs pour laisser le PPU se resynchroniser avec la RAM.
-                                    #    Le PPU (nametables visuels) n'est PAS restauré par copyto —
-                                    #    il faut ~30 frames pour que le rendu corresponde à nouveau
-                                    #    à la position CPU. Sinon Claude reçoit un screenshot corrompu.
-                                    for _noop_i in range(30):
+                                    if checkpoint.get('has_full_backup'):
+                                        # Restauration complète (CPU + PPU VRAM) via _backup/_restore.
+                                        # Visuel = collision dès la frame 1 — aucun décor fantôme.
+                                        self.env.unwrapped._restore()
+                                        obs, _, _, _last_replay_info = self.env.step(0)  # 1 NOOP pour obs frais
                                         self.env.unwrapped.done = False
-                                        obs, _, _, _last_replay_info = self.env.step(0)
-                                    self.env.unwrapped.done = False
-                                    # 4. Bloquer les appels Claude pendant 5 steps supplémentaires
-                                    #    (la variable step_count n'a pas encore été incrémentée ici,
-                                    #    on utilise une valeur relative au step courant + marge)
+                                        print(f"⏪ FULL restore (CPU+PPU) → x={checkpoint['x_pos']} "
+                                              f"(step={checkpoint['step']})")
+                                    else:
+                                        # Fallback RAM uniquement (checkpoint ancien, slot backup écrasé).
+                                        # 30 NOOPs pour resynchroniser le PPU (nametable tiles).
+                                        # Si Mario meurt pendant les NOOPs (trou), on re-restore la RAM
+                                        # immédiatement pour éviter qu'il rejoue la mort.
+                                        np.copyto(self.env.unwrapped._ram_buffer(), checkpoint_ram)
+                                        _noop_died = False
+                                        for _noop_i in range(30):
+                                            self.env.unwrapped.done = False
+                                            obs, _, _noop_done, _last_replay_info = self.env.step(0)
+                                            if _noop_done:
+                                                # Mario mort pendant les NOOPs (trou) — re-restaurer
+                                                np.copyto(self.env.unwrapped._ram_buffer(), checkpoint_ram)
+                                                self.env.unwrapped.done = False
+                                                obs, _, _, _last_replay_info = self.env.step(0)
+                                                _noop_died = True
+                                                print(f"⏪ Mario mort NOOP#{_noop_i} → RAM re-restaurée x={checkpoint['x_pos']}")
+                                                break
+                                        self.env.unwrapped.done = False
+                                        if not _noop_died:
+                                            print(f"⏪ RAM fallback + 30 NOOPs → x={checkpoint['x_pos']} "
+                                                  f"(step={checkpoint['step']})")
+                                    # Bloquer les appels Claude le temps que le PPU soit stable
                                     self._ppu_warmup_until = step_count + 5
-                                    # 4. Sauvegarder ce snapshot RAM pour le replay parfait.
-                                    #    Le replay repartira exactement de ce point (pas de
-                                    #    reconstitution partielle → timing ennemi identique).
-                                    self._perfect_start_ram = checkpoint_ram.copy()
-                                    self._perfect_start_x = checkpoint['x_pos']
-                                    print(f"⏪ RAM restaurée + 30 NOOPs PPU sync → x={checkpoint['x_pos']} "
-                                          f"(step={checkpoint['step']}) — Claude bloqué jusqu'au step {self._ppu_warmup_until}")
+                                    # Enregistrer CE checkpoint dans la liste (multi-rewind).
+                                    _cp_entry = {'index': _perfect_len, 'ram': checkpoint_ram.copy(), 'x': checkpoint['x_pos']}
+                                    self._rewind_checkpoints = [c for c in self._rewind_checkpoints if c['index'] < _perfect_len]
+                                    self._rewind_checkpoints.append(_cp_entry)
+                                    print(f"   Claude bloqué jusqu'au step {self._ppu_warmup_until}")
                                 else:
                                     # Fallback : replay complet depuis frame 0 si pas de snapshot
                                     self.env.reset()
@@ -5515,6 +5965,8 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     'y_pos': int(_post_rewind_y),
                                     'macros': [],
                                     'action_history': list(self._final_action_history),
+                                    'perfect_history_len': len(self._final_action_history),
+                                    'has_full_backup': False,
                                 })
                                 self._last_run_jump_over_x = -999  # Empêche conversion run_jump_over→pipe_jump après rewind
                                 self.logger.log_game_event("REWIND_OK", step_count, {

@@ -53,6 +53,16 @@ env.step(current_action)  ← NE PAS appeler si current_action is None (PAUSE)
 4. `inject_known_solution` : ne clear pas la queue si un jump macro est en cours ou planifié
 5. Stuck mode → reset `last_reflex_step = step_count` (force cooldown 25f)
 
+### Système MID-AIR — principe fondamental
+- **But unique** : ajuster l'atterrissage du saut en cours (où Mario va tomber), PAS planifier la suite
+- `far`   → continuer right+A+B (atterrir loin)
+- `short` → NOOP pendant 8f max (chute quasi-verticale, stoppe l'avance droite, atterrit avant l'ennemi)
+- `left`  → virer à gauche
+- `stop`  → chute verticale
+- **INTERDIT** : injecter `run_jump_over`, `pipe_jump` ou toute autre action après un choix MID-AIR
+- Mario est EN L'AIR → il ne peut pas sauter à nouveau ; envoyer un jump n'a aucun effet et pollue la queue
+- Après l'atterrissage, le cycle normal reprend (Claude async décide via le trigger habituel)
+
 ### Système de phases (vies)
 - Phase 1 (1ère vie) : IA pure
 - Phase 2 (2ème vie) : 50% replay mémoire + IA
