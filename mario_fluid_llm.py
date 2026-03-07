@@ -67,7 +67,7 @@ class MarioFluidLLM:
             # Mouvements de base
             'walk_right': {'base_action': 1, 'duration': 15, 'description': 'Marcher à droite'},
             'run_forward': {'base_action': 3, 'duration': 25, 'description': 'Courir vers la droite (plus rapide)'},
-            'step_back': {'base_action': 6, 'duration': 20, 'description': 'Reculer/éviter danger (~60px par défaut)'},
+            'step_back': {'base_action': 6, 'duration': 7, 'description': 'Reculer/éviter danger (~20px par défaut)'},
             'wait': {'base_action': 0, 'duration': 3, 'description': 'Attendre/observer'},
 
             # Sauts tactiques
@@ -192,6 +192,7 @@ class MarioFluidLLM:
         self.deaths_count = 0
         self.lives_used = 0
         self.mario_lives_remaining = 3  # Mario commence avec 3 vies
+        self._current_level_completed = False  # True seulement si VICTORY détecté ce stage
 
         # Système d'historique d'apprentissage
         self.action_history = deque(maxlen=50)  # Historique détaillé des actions
@@ -296,11 +297,13 @@ class MarioFluidLLM:
         # Les actions sont des entiers NES bruts, rejoués frame par frame avant de passer en IA.
         self._raw_replay_actions = []   # list[int] — chargé depuis perfect_run_{w}-{l}.json
         self._raw_replay_index = 0      # index courant dans _raw_replay_actions
+        self._raw_replay_checkpoints = {}  # dict[index → ram_array] — checkpoints rewind du replay
 
         # Tracking des tentatives de saut échouées par position
         # Une tentative est "échouée" si le saut se termine avec delta_x < 40px (obstacle non franchi).
         self._failed_jump_attempts = {}  # {x_bucket_30px: [macro_name, ...]}
         self._prev_macro_name = None     # macro_name capturé au frame précédent (détection transition)
+        self._step_back_injected_at = -100  # step où le dernier step_back a été injecté (cooldown anti-boucle)
 
         # Système hybride optimisé screenshot + positions
         self.level_context_established = False  # Si Claude a la carte du niveau
@@ -1232,6 +1235,24 @@ class MarioFluidLLM:
                     self._rewind_correction_msg = None  # Consommé
                     self._rewind_death_x = None
 
+            # Bloc danger zone : position de mort connue devant Mario
+            _danger_zone_info = situation.get('danger_zone')
+            if _danger_zone_info:
+                _dz_dist = _danger_zone_info['dist']
+                _dz_x = _danger_zone_info['x']
+                if _dz_dist < 60:
+                    _dz_urgency = "IMMINENT"
+                    _dz_action = f"max_jump px={max(0, _dz_dist - 15)} (saute maintenant)"
+                else:
+                    _dz_urgency = "PROCHE"
+                    _dz_action = f"run_jump_over approach_px={max(0, _dz_dist - 50)} (avance puis saute)"
+                _rewind_block += (
+                    f"DANGER ZONE ({_dz_urgency}): trou/mort connue a x={_dz_x}px "
+                    f"— {_dz_dist}px devant Mario.\n"
+                    f"Action recommandée : {_dz_action}\n"
+                    f"Ne pas faire run_forward sans sauter — Mario est mort ici avant.\n\n"
+                )
+
             # Section macros bloquées à la position courante
             _ss_bucket = int(mario_x // 50) * 50
             _ss_blocked = getattr(self, '_blocked_macros_by_pos', {}).get(_ss_bucket, set())
@@ -1315,14 +1336,24 @@ class MarioFluidLLM:
                 )
                 if _nearby_enemy_deaths >= 2:
                     _enemy_hint = "run_jump_over (stomp a déjà échoué ici — SAUTER par-dessus est plus sûr)"
-                    _enemy_default = "run_jump_over"
                 else:
                     _enemy_hint = "run_jump_over (recommandé — sauter par-dessus l'ennemi)"
-                    _enemy_default = "run_jump_over"
+                # Contexte mid-jump : Mario est en l'air, un ennemi vient d'apparaître
+                _mid_jump_info = situation.get('mid_jump_enemy')
+                if _mid_jump_info:
+                    _queued_str = ', '.join(_mid_jump_info['queued']) if _mid_jump_info['queued'] else 'aucune'
+                    _mid_jump_block = (
+                        f"\nATTENTION: Mario est EN L'AIR (saut en cours).\n"
+                        f"Actions actuellement en queue apres l'atterrissage : {_queued_str}\n"
+                        f"Si l'ennemi est au-dela de la zone couverte par ces actions, remplace-les.\n"
+                        f"Si elles sont deja adequates (ex: run_jump_over au bon px), confirme en les gardant.\n"
+                    )
+                else:
+                    _mid_jump_block = ""
                 prompt = _rewind_block + f"""⚠️⚠️⚠️ ENNEMI DÉTECTÉ — DÉCISION URGENTE ⚠️⚠️⚠️
 Mario: X={mario_x}px | Step: {step_count} | Score: {mario['score']}
 ENNEMI à {dist}px DEVANT Mario (position écran x={closest['x_screen']}).
-
+{_mid_jump_block}
 Ennemi détecté à environ {dist}px. Regarde le screenshot et CHOISIS:
   A) run_jump_over px=<distance_saut> [approach_px=<élan_optionnel>]
      → Sauter PAR-DESSUS l'ennemi.
@@ -1335,10 +1366,28 @@ JSON uniquement — 1 seule action:
 {{"actions":[{{"macro_action":"run_jump_over","px":<ta_valeur>}}],"urgency":10}}"""
             elif _hole_urgent:
                 # PROMPT COURT — trou devant : décision urgente
-                #  JAMAIS de px pour max_jump sur trou urgent !
-                # L'approche "px" fait courir Mario jusqu'au bord du trou AVANT de sauter
-                # → Mario tombe (impossible de sauter depuis le vide). Sauter IMMÉDIATEMENT.
-                _hole_action_hint = f'{{"actions":[{{"macro_action":"max_jump"}}],"urgency":10}}'
+                # Deux cas selon la distance :
+                #   < 40px : saut immédiat (max_jump sans px)
+                #   40-120px : run_jump_over avec approach pour plus de portée
+                _hole_critical_now = _hole_dist < 40
+                if _hole_critical_now:
+                    _approach_crit = max(0, _hole_dist - 5)
+                    _hole_action_hint = f'{{"actions":[{{"macro_action":"max_jump","px":{_approach_crit}}}],"urgency":10}}'
+                    _hole_choice_text = (
+                        f"  A) max_jump px={_approach_crit} → SAUTER (trou à {_hole_dist}px — px=approche avant bord)\n"
+                        f"  B) pipe_jump → SEULEMENT si tu vois un GRAND TUYAU VERT devant le trou\n\n"
+                        f"❌ INTERDIT: run_forward seul (Mario tombe dans le trou)"
+                    )
+                else:
+                    _approach = max(0, _hole_dist - 40)
+                    _hole_action_hint = f'{{"actions":[{{"macro_action":"run_jump_over","approach_px":{_approach}}}],"urgency":10}}'
+                    _hole_choice_text = (
+                        f"  A) run_jump_over approach_px={_approach} → courir {_approach}px PUIS sauter (RECOMMANDÉ — trou à {_hole_dist}px)\n"
+                        f"  B) max_jump px={max(0, _hole_dist - 5)} → sauter immédiatement (moins de portée)\n"
+                        f"  C) pipe_jump → SEULEMENT si tu vois un GRAND TUYAU VERT devant le trou\n\n"
+                        f"❌ INTERDIT: run_forward seul (Mario tombe dans le trou)\n"
+                        f"❌ approach_px ne doit PAS dépasser {_hole_dist - 10} (sinon Mario court dans le vide)"
+                    )
                 prompt = _rewind_block + f"""🕳️🕳️🕳️ TROU DÉTECTÉ — DÉCISION URGENTE 🕳️🕳️🕳️
 Mario: X={mario_x}px | Step: {step_count}
 TROU à {_hole_dist}px DEVANT Mario (largeur ~{_hole_width}px).
@@ -1346,27 +1395,24 @@ TROU à {_hole_dist}px DEVANT Mario (largeur ~{_hole_width}px).
 Regarde le screenshot — le sol s'arrête devant Mario.
 
 CHOISIS:
-  A) max_jump  → sauter IMMÉDIATEMENT (recommandé — le trou est assez loin pour sauter par-dessus)
-  B) pipe_jump → SEULEMENT si tu vois un GRAND TUYAU VERT devant le trou
-
-❌ INTERDIT: run_forward (Mario tombe dans le trou → mort garantie)
-❌ INTERDIT: max_jump avec "px" (courir jusqu'au bord = chute garantie)
+{_hole_choice_text}
 
 JSON uniquement — 1 seule action:
 {_hole_action_hint}"""
             elif _pipe_urgent:
                 # PROMPT COURT — tuyau/obstacle devant : saut anticipé
                 # Mario a encore de la distance → on peut choisir le bon saut
-                _pipe_action_hint = f'{{"actions":[{{"macro_action":"{_pipe_jump_type}"}}],"urgency":9}}'
+                _pipe_approach = max(0, _pipe_dist - 20)
+                _pipe_action_hint = f'{{"actions":[{{"macro_action":"{_pipe_jump_type}","px":{_pipe_dist}}}],"urgency":9}}'
                 if _pipe_jump_type == 'pipe_jump':
-                    _pipe_desc = "pipe_jump (recommandé — approche + grand saut = franchit les tuyaux hauts)"
-                    _pipe_alt = "obstacle_jump (si tuyau très haut)"
+                    _pipe_desc = f"pipe_jump px={_pipe_dist} (recommandé — approche + grand saut = franchit les tuyaux hauts)"
+                    _pipe_alt = f"obstacle_jump px={_pipe_dist} (si tuyau très haut)"
                 elif _pipe_jump_type == 'obstacle_jump':
-                    _pipe_desc = "obstacle_jump (obstacle très haut)"
-                    _pipe_alt = "pipe_jump (si tuyau standard)"
+                    _pipe_desc = f"obstacle_jump px={_pipe_dist} (obstacle très haut)"
+                    _pipe_alt = f"pipe_jump px={_pipe_dist} (si tuyau standard)"
                 else:
-                    _pipe_desc = "max_jump (obstacle bas)"
-                    _pipe_alt = "pipe_jump (si tuyau standard)"
+                    _pipe_desc = f"max_jump px={_pipe_dist} (obstacle bas)"
+                    _pipe_alt = f"pipe_jump px={_pipe_dist} (si tuyau standard)"
                 prompt = _rewind_block + f"""🟢🟢🟢 TUYAU/OBSTACLE DÉTECTÉ — SAUT ANTICIPÉ 🟢🟢🟢
 Mario: X={mario_x}px | Step: {step_count}
 OBSTACLE à {_pipe_dist}px DEVANT Mario (hauteur estimée ~{_pipe_height}px).
@@ -1377,7 +1423,10 @@ Mario est encore à bonne distance pour prendre de l'élan et franchir.
 CHOISIS:
   A) {_pipe_desc}
   B) {_pipe_alt}
-  C) max_jump → si obstacle bas (<20px)
+  C) max_jump px={_pipe_dist} → si obstacle bas (<20px)
+  D) run_jump_over px={_pipe_dist} approach_px={_pipe_approach} → courir {_pipe_approach}px puis sauter (si tu vois aussi un trou derrière l'obstacle)
+
+"px" = distance en pixels NES entre Mario et l'obstacle.
 
 ❌ INTERDIT: run_forward seul (Mario se coince contre le tuyau)
 ❌ INTERDIT: attendre (Mario s'immobilise contre le tuyau)
@@ -1439,7 +1488,7 @@ JSON uniquement — 1 seule action:
 REGARDE LE SCREENSHOT — QUE VOIS-TU DIRECTEMENT A DROITE DU SPRITE DE MARIO ?
   Sol plat libre     => run_forward px=<distance NES jusqu'au prochain obstacle>
   Tuyau vert         => pipe_jump px=<distance NES jusqu'au tuyau>  (px = approche d'élan)
-  Sol absent / vide  => max_jump px=<distance d'approche avant bord>
+  Sol absent / vide  => run_jump_over px=<dist_saut> approach_px=<élan_avant_bord> (RECOMMANDÉ si espace >20px) ou max_jump px=<dist_approche_avant_bord>
   Ennemi             => run_jump_over px=<distance_saut> approach_px=<élan> ou stomp_enemy px=<distance_ennemi - 10>
 
 "px" = distance en pixels NES entre Mario et l'obstacle dans le screenshot. OBLIGATOIRE sur toutes les actions.
@@ -1452,7 +1501,7 @@ ACTIONS DISPONIBLES (toutes avec px obligatoire):
   pipe_vertical_jump (tuyau TRES HAUT >50px ET Mario COLLÉ <30px — saut vertical puis dérive droite)
   run_jump_over px approach_px (optionnel) | stomp_enemy px | step_back
   high_jump (saut vertical haut, utile escalier) | big_jump_right (saut max vers droite)
-  DOUBLE SAUT possible : donne 2 sauts consécutifs ex: {{"actions":[{{"macro_action":"obstacle_jump"}},{{"macro_action":"max_jump"}}],"urgency":9}}
+  DOUBLE SAUT possible : donne 2 sauts consécutifs ex: {{"actions":[{{"macro_action":"obstacle_jump","px":60}},{{"macro_action":"max_jump","px":40}}],"urgency":9}}
 
 Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
 {{"actions":[{{"macro_action":"pipe_jump","px":80}}],"urgency":9}}"""
@@ -1579,15 +1628,21 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
             _h_near = hole_info['nearest']
             _h_w    = hole_info['width']
             if hole_info.get('critical'):
-                # Saut IMMÉDIAT — jamais d'approche (courir jusqu'au bord = chute)
-                _hole_json = f'{{"macro_action":"max_jump"}}'
+                _approach_imm = max(0, _h_near - 5)
+                _hole_json = f'{{"macro_action":"max_jump","px":{_approach_imm}}}'
                 hole_section = (f"\n TROU CRITIQUE: sol absent à {_h_near}px (largeur {_h_w}px)"
-                                f"\n→ SAUTER IMMÉDIATEMENT: {{{_hole_json}}} —  jamais de px pour max_jump sur trou")
+                                f"\n→ SAUTER IMMÉDIATEMENT: {_hole_json}")
             elif hole_info.get('urgent'):
-                # Saut IMMÉDIAT — jamais d'approche (courir jusqu'au bord = chute)
-                _hole_json = f'{{"macro_action":"max_jump"}}'
-                hole_section = (f"\n TROU URGENT à {_h_near}px (largeur {_h_w}px)"
-                                f"\n→ SAUTER IMMÉDIATEMENT: {{{_hole_json}}} —  jamais de px pour max_jump sur trou")
+                if _h_near < 40:
+                    _approach_imm = max(0, _h_near - 5)
+                    _hole_json = f'{{"macro_action":"max_jump","px":{_approach_imm}}}'
+                    hole_section = (f"\n TROU URGENT à {_h_near}px (largeur {_h_w}px)"
+                                    f"\n→ SAUTER: {_hole_json} (px = approche avant saut)")
+                else:
+                    _approach_px3 = max(0, _h_near - 40)
+                    _hole_json = f'{{"macro_action":"run_jump_over","approach_px":{_approach_px3}}}'
+                    hole_section = (f"\n TROU à {_h_near}px (largeur {_h_w}px)"
+                                    f"\n→ run_jump_over approach_px={_approach_px3} (courir {_approach_px3}px puis sauter)")
             else:
                 _approach_px2 = max(0, _h_near - 30)
                 _hole_json = f'{{"macro_action":"max_jump","px":{_approach_px2}}}'
@@ -1664,7 +1719,7 @@ Donne 1-3 actions MAX. JSON avec UN seul objet actions[] :
 4. ✅ Si ennemi "S'ÉLOIGNE" → run_forward pour le rattraper et le stomp (ou passer s'il est trop loin)
 5. ⚡ EN CAS DE DOUTE → run_forward pour approcher, puis stomp_enemy quand < 50px
 6. 🎯 Priorité absolue: SURVIE > Collecte de blocs/items
-7. ⛰️ TROU DÉTECTÉ → max_jump px=<approche> (trou loin) ou max_jump sans px (trou immédiat <20px). "px" = distance à courir AVANT de sauter, PAS la largeur du trou.
+7. ⛰️ TROU DÉTECTÉ → max_jump px=<approche> TOUJOURS (même trou immédiat → px=0 ou px=5). "px" = distance à courir AVANT de sauter, PAS la largeur du trou.
 8. ⚠️ APRÈS stomp_enemy : NE PAS mettre run_forward si ennemi encore visible !
 
 🎯 DONNE 2-3 ACTIONS ADAPTÉES À LA SITUATION!
@@ -2690,8 +2745,18 @@ Si la séquence actuelle est déjà optimale, utilise-la mais essaie quand même
             m = _re.search(r'perfect_run_(\d+)-(\d+)\.json', os.path.basename(f))
             if m:
                 w, l = int(m.group(1)), int(m.group(2))
-                if (w, l) in LEVEL_SEQUENCE:
-                    completed.append((w, l, f))
+                if (w, l) not in LEVEL_SEQUENCE:
+                    continue
+                # Ne compter que les runs réellement complétés
+                try:
+                    import json as _json
+                    with open(f) as _fh:
+                        _d = _json.load(_fh)
+                    if not _d.get('completed', False):
+                        continue
+                except Exception:
+                    continue
+                completed.append((w, l, f))
         if not completed:
             return None, None, None
         # Trier par ordre dans LEVEL_SEQUENCE
@@ -3123,24 +3188,31 @@ ACTIONS INTERDITES (déjà essayées sans effet): {failed_str}
                 # où Mario saute de plateforme en plateforme avec ~20-35px d'avance par saut.
                 # Au 2e échec consécutif dans la même zone : step_back injecté avant ce saut.
                 _new_jump_x = int(_ram_now[0x6D]) * 256 + int(_ram_now[0x86])
+                _new_jump_y = int(_ram_now[0x03])
                 if self._pre_jump_ram is not None:
                     _pipe_advance = _new_jump_x - self._pre_jump_x
-                    if _pipe_advance < 10:
-                        _jbucket_pipe = int(max(self._pre_jump_x, 0) // 50) * 50
-                        if _jbucket_pipe not in self._failed_jump_attempts:
-                            self._failed_jump_attempts[_jbucket_pipe] = []
-                        self._failed_jump_attempts[_jbucket_pipe].append(macro_name)
-                        _n_pipe_fails = len(self._failed_jump_attempts[_jbucket_pipe])
-                        self.logger.log_queue_event("JUMP_FAIL", getattr(self, '_current_step', 0),
-                            f"jump→jump advance={_pipe_advance:.0f}px bucket={_jbucket_pipe} n={_n_pipe_fails}")
-                        if _n_pipe_fails >= 2:
-                            self._failed_jump_attempts.pop(_jbucket_pipe, None)
+                    # Si Mario a monté sur une plateforme (y diminue = montée en NES),
+                    # le saut est réussi même si l'avance x est faible ou négative.
+                    # Ne pas déclencher step_back si Mario a gagné de la hauteur (>15px).
+                    _height_gain = self._pre_jump_y - _new_jump_y  # positif = Mario est monté
+                    _climbed_platform = _height_gain > 15
+                    if _pipe_advance < 10 and not _climbed_platform:
+                        _cur_step = getattr(self, '_current_step', 0)
+                        self.logger.log_queue_event("JUMP_FAIL", _cur_step,
+                            f"jump→jump advance={_pipe_advance:.0f}px x={_new_jump_x}")
+                        # Injecter step_back seulement si cooldown écoulé (évite boucle infinie)
+                        if _cur_step - self._step_back_injected_at >= 50:
                             self.action_queue.appendleft(macro_decision)
                             self.action_queue.appendleft({'macro_name': 'step_back'})
-                            self.logger.log_queue_event("STUCK ", getattr(self, '_current_step', 0),
+                            self._step_back_injected_at = _cur_step
+                            self._pre_jump_ram = None  # reset baseline post-step_back
+                            self.logger.log_queue_event("STUCK ", _cur_step,
                                 f"pipe stuck x={_new_jump_x} → step_back + {macro_name}")
-                            print(f"Pipe stuck ({_n_pipe_fails}x sans avancer 10px) → step_back + {macro_name}")
+                            print(f"Pipe stuck (advance={_pipe_advance:.0f}px) → step_back + {macro_name}")
                             return  # step_back prend la main, saut rejoué ensuite
+                    elif _climbed_platform:
+                        self.logger.log_queue_event("JUMP_OK", getattr(self, '_current_step', 0),
+                            f"plateforme montée +{_height_gain:.0f}px x={_new_jump_x}")
                 self._pre_jump_ram = _ram_now.copy()
                 # Lire x_pos directement depuis la RAM NES (évite la staleness de last_situation)
                 # Formule gym-super-mario-bros : RAM[0x6D]*256 + RAM[0x86]
@@ -4277,26 +4349,24 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         _has_continue = _has_perfect and _next_stage is not None
 
         print("\n CHOISISSEZ VOTRE MODE:")
-        print("   1. Nouvelle partie (IA pure, sans mémoire)")
-        print("   2. Mémoire automatique (rejoue les segments connus -> IA à la frontière)")
+        print("   1. Nouvelle partie (IA pure)")
         if _has_perfect:
-            print("   3. Rejouer le run parfait (sans pauses, sans IA)")
+            print("   2. Rejouer le run parfait (sans pauses, sans IA)")
         if _has_continue:
             lw, ll = _last_stage
             nw, nl = _next_stage
-            print(f"   4. Replay auto World {lw}-{ll} -> IA World {nw}-{nl} (enchaîne les stages)")
-            print(f"   5. Commencer directement en World {nw}-{nl} (dernier stage non terminé)")
-            print("   6. Effacer la mémoire des segments")
-            print("   7. Quitter")
-            _max_choice = "7"
-        elif _has_perfect:
+            print(f"   3. Commencer directement en World {nw}-{nl} (dernier stage non terminé)")
             print("   4. Effacer la mémoire des segments")
             print("   5. Quitter")
             _max_choice = "5"
-        else:
+        elif _has_perfect:
             print("   3. Effacer la mémoire des segments")
             print("   4. Quitter")
             _max_choice = "4"
+        else:
+            print("   2. Effacer la mémoire des segments")
+            print("   3. Quitter")
+            _max_choice = "3"
         try:
             while True:
                 try:
@@ -4308,22 +4378,15 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                 if choice == "1":
                     self.logger.log_menu_choice("new_game")
                     return "new_game", None
-                elif choice == "2":
-                    if not seg_mem.stage.sequences:
-                        print("  Mémoire vide — démarrage en IA pure (les segments seront mémorisés).")
-                    self.logger.log_menu_choice("memory_first")
-                    return "memory_first", None
-                elif choice == "3" and _has_perfect:
+                elif choice == "2" and _has_perfect:
                     self.play_perfect_replay()
                     return self.show_game_menu()
-                elif choice == "4" and _has_continue:
-                    self.logger.log_menu_choice("continue_with_replay")
-                    return "continue_with_replay", None
-                elif choice == "5" and _has_continue:
+                elif choice == "3" and _has_continue:
                     self.logger.log_menu_choice("continue_direct")
                     return "continue_direct", None
-                elif choice == "3" and not _has_perfect:
-                    _choice_clear = "3"
+                elif ((_has_continue and choice == "4") or
+                      (_has_perfect and not _has_continue and choice == "3") or
+                      (not _has_perfect and choice == "2")):
                     confirm = input("  Confirmer l'effacement de la mémoire ? (o/N): ").strip().lower()
                     if confirm == "o":
                         self.segment_memory.clear_memory()
@@ -4332,20 +4395,9 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     else:
                         print("Annulé.")
                     return self.show_game_menu()
-                elif ((_has_continue and choice == "6") or
+                elif ((_has_continue and choice == "5") or
                       (_has_perfect and not _has_continue and choice == "4") or
                       (not _has_perfect and choice == "3")):
-                    confirm = input("  Confirmer l'effacement de la mémoire ? (o/N): ").strip().lower()
-                    if confirm == "o":
-                        self.segment_memory.clear_memory()
-                        print(" Mémoire effacée.")
-                        self.logger.log_menu_choice("clear_memory")
-                    else:
-                        print("Annulé.")
-                    return self.show_game_menu()
-                elif ((_has_continue and choice == "7") or
-                      (_has_perfect and not _has_continue and choice == "5") or
-                      (not _has_perfect and choice == "4")):
                     self.logger.log_menu_choice("quit")
                     return "quit", None
                 else:
@@ -4409,10 +4461,41 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
             level = self.current_level
         logs_dir = os.path.join(os.path.dirname(__file__) or '.', 'logs')
         os.makedirs(logs_dir, exist_ok=True)
-        # Écraser uniquement le fichier du même stage (pas les autres stages)
         path = os.path.join(logs_dir, f'perfect_run_{world}-{level}.json')
+        _new_completed = getattr(self, '_current_level_completed', False)
+        _new_total = len(self._final_action_history)
+        _new_max_x = int(getattr(self, '_run_max_x', 0))
+        # Protection contre l'écrasement d'un meilleur run existant.
+        # Règles :
+        #   1. Run complet existant + nouveau incomplet → conserver l'existant
+        #   2. Les deux complets, nouveau plus long → conserver l'existant (plus court = plus optimal)
+        #   3. Run incomplet existant + nouveau incomplet moins avancé → conserver l'existant
+        #   4. Tout autre cas → écraser (nouveau meilleur)
+        if os.path.exists(path):
+            try:
+                with open(path) as _f:
+                    _existing = json.load(_f)
+                _ex_completed = _existing.get('completed', False)
+                _ex_total = _existing.get('total', len(_existing.get('actions', [])))
+                _ex_max_x = int(_existing.get('max_x', 0))
+                if _ex_completed and not _new_completed:
+                    # Règle 1 : jamais écraser un run complet avec un incomplet
+                    print(f" Run incomplet (max_x={_new_max_x}) — run complet existant conservé ({_ex_total} actions)")
+                    return
+                if _ex_completed and _new_completed and _new_total >= _ex_total:
+                    # Règle 2 : run complet existant plus court = plus optimal
+                    print(f" Run complet existant plus court ({_ex_total} vs {_new_total} actions) — conservé")
+                    return
+                if not _ex_completed and not _new_completed and _new_max_x <= _ex_max_x:
+                    # Règle 3 : run incomplet existant va plus loin
+                    print(f" Run incomplet existant plus avancé (max_x={_ex_max_x} vs {_new_max_x}) — conservé")
+                    return
+            except Exception:
+                pass  # Fichier corrompu → écraser
         data = {'actions': self._final_action_history,
-                'total': len(self._final_action_history),
+                'total': _new_total,
+                'completed': _new_completed,
+                'max_x': _new_max_x,
                 'world': world,
                 'level': level}
         if self._rewind_checkpoints:
@@ -4667,11 +4750,20 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                 print("  Impossible de continuer — aucun run parfait ou plus de stages.")
                 game_mode = "new_game"
             else:
-                import json as _json
+                import json as _json, base64 as _b64
                 with open(run_path) as _f:
                     _rdata = _json.load(_f)
                 self._raw_replay_actions = [int(a) for a in _rdata['actions']]
                 self._raw_replay_index = 0
+                # Charger les checkpoints rewind pour restauration RAM pendant le replay
+                _raw_cps = _rdata.get('rewind_checkpoints')
+                if _raw_cps:
+                    self._raw_replay_checkpoints = {
+                        c['index']: np.frombuffer(_b64.b64decode(c['ram']), dtype=np.uint8).copy()
+                        for c in _raw_cps
+                    }
+                else:
+                    self._raw_replay_checkpoints = {}
                 lw, ll = last_stage
                 nw, nl = next_stage
                 print(f" Replay auto World {lw}-{ll} ({len(self._raw_replay_actions)} frames) → IA World {nw}-{nl}")
@@ -4734,6 +4826,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
         paused = False
         last_mario_decision = None
         _run_max_x = 0  # Position maximale atteinte dans ce run
+        self._run_max_x = 0  # Copie accessible depuis _save_perfect_run
         _seg_x = 0     # Dernière position connue de Mario (persiste entre itérations, y compris en PAUSE)
 
         cv2.namedWindow('Mario Fluide - Claude LLM', cv2.WINDOW_AUTOSIZE)
@@ -4747,6 +4840,15 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                     # Rejoue les actions NES frame par frame, sans pause, sans IA.
                     # Quand le stock est épuisé, l'IA prend la main normalement.
                     if self._raw_replay_actions and self._raw_replay_index < len(self._raw_replay_actions):
+                        # Restaurer la RAM si un checkpoint rewind existe à cet index
+                        _cp_ram = getattr(self, '_raw_replay_checkpoints', {}).get(self._raw_replay_index)
+                        if _cp_ram is not None:
+                            self.env.unwrapped.done = False
+                            np.copyto(self.env.unwrapped._ram_buffer(), _cp_ram)
+                            for _ in range(30):
+                                self.env.unwrapped.done = False
+                                self.env.step(0)
+                            self.env.unwrapped.done = False
                         current_action = self._raw_replay_actions[self._raw_replay_index]
                         self._raw_replay_index += 1
                         _pct = int(100 * self._raw_replay_index / len(self._raw_replay_actions))
@@ -4907,6 +5009,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                         _seg_x = real_info.get('x_pos', 0)
                         if _seg_x > _run_max_x:
                             _run_max_x = _seg_x
+                            self._run_max_x = _seg_x
                         self.segment_memory.record_position(_seg_x, step_count)
 
                         #  TRACKING SAUTS ÉCHOUÉS
@@ -4923,28 +5026,15 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                             _jump_x_delta = _seg_x - self._pre_jump_x
                             _jbucket = int(self._pre_jump_x // 50) * 50  # aligné avec _blocked_macros_by_pos
                             if _jump_x_delta < 40:
-                                # Saut échoué : obstacle non franchi
-                                if _jbucket not in self._failed_jump_attempts:
-                                    self._failed_jump_attempts[_jbucket] = []
-                                self._failed_jump_attempts[_jbucket].append(_prev_frame_macro)
-                                _n_fails = len(self._failed_jump_attempts[_jbucket])
-                                self.logger.log_queue_event("JUMP_FAIL", step_count,
-                                    f"macro={_prev_frame_macro} x_start={self._pre_jump_x:.0f} delta={_jump_x_delta:.0f}px | "
-                                    f"tentatives={_n_fails} bucket={_jbucket}")
-                                if _n_fails >= 2:
-                                    # Annuler l'appel async en cours (sa réponse sera STALE)
-                                    self._claude_generation += 1
-                                    self.claude_thinking = False
-                                    self.call_claude_obstacle_retry(
-                                        self._failed_jump_attempts[_jbucket],
-                                        self._pre_jump_x, _seg_x, obs, step_count)
-                                    self._failed_jump_attempts.pop(_jbucket, None)
-                            elif _seg_x > _jbucket + 100 and _prev_frame_macro != 'run_jump_over':
-                                # Saut vraiment réussi : Mario est bien au-delà du bucket de départ.
-                                # Seuil 100px ET on exclut run_jump_over (ennemi, pas obstacle) :
-                                # un saut ennemi peut déplacer Mario de 60-80px sans franchir le tuyau,
-                                # ce qui effacerait les échecs d'obstacle et empêcherait l'obstacle_retry.
-                                self._failed_jump_attempts.pop(_jbucket, None)
+                                # Saut échoué : injecter step_back si cooldown écoulé
+                                if step_count - self._step_back_injected_at >= 50:
+                                    self.logger.log_queue_event("JUMP_FAIL", step_count,
+                                        f"macro={_prev_frame_macro} x_start={self._pre_jump_x:.0f} delta={_jump_x_delta:.0f}px")
+                                    self.action_queue.appendleft({'macro_name': 'step_back'})
+                                    self._step_back_injected_at = step_count
+                                    self.logger.log_queue_event("STUCK ", step_count,
+                                        f"jump fail→step_back x={_seg_x:.0f} macro={_prev_frame_macro}")
+                                    print(f"Jump fail ({_prev_frame_macro} delta={_jump_x_delta:.0f}px) → step_back automatique")
 
                         #  Checkpoint rewind (toutes les 60 frames)
                         # Ne pas sauvegarder si done=True (frame de mort) — checkpoint invalide
@@ -5339,21 +5429,14 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     a.get('macro_name') in _avoidance_macros
                                     for a in self.action_queue)
                                 if _queue_has_avoidance and _new_enemy_mid_jump:
-                                    # Nouvel ennemi apparu pendant le saut — l'action en queue
-                                    # était planifiée pour l'ennemi précédent (déjà passé).
-                                    # Transition SEAMLESS : prolonger le saut avec max_jump (même base_action=4)
-                                    # Mario continue de sauter sans interruption.
-                                    self.action_queue.clear()
-                                    self.action_queue.append({
-                                        'macro_name': 'run_jump_over',
-                                        'reasoning': 'Nouvel ennemi mid-jump — transition seamless',
-                                        'urgency': 9
-                                    })
-                                    # Terminer le macro courant dès le prochain frame
-                                    if self.current_macro:
-                                        self.current_macro['frames_left'] = 0
+                                    # Nouvel ennemi apparu pendant le saut — décision remise à Claude
+                                    _queued_names = [a.get('macro_name', '?') for a in list(self.action_queue)[:3]]
+                                    situation['mid_jump_enemy'] = {
+                                        'queued': _queued_names,
+                                        'change_reason': _change_reason,
+                                    }
                                     self.logger.log_queue_event("SCAN  ", step_count,
-                                        f"NOUVEL ENNEMI mid-jump [{_change_reason}] → transition seamless max_jump")
+                                        f"NOUVEL ENNEMI mid-jump [{_change_reason}] → Claude décide")
                                     if not self.claude_thinking:
                                         _scene_trigger = True
                                     # Si claude_thinking, le flag seuil reste (déjà ajouté) → re-trigger quand libre
@@ -5521,7 +5604,8 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                 situation['holes'] = _snap['hole']
                                 _hole_trigger = True
 
-                    #  RÉFLEXE DANGER ZONE : si Mario approche d'une position de mort connue
+                    # Danger zone : si Mario approche d'une position de mort connue,
+                    # déclencher Claude avec contexte (pas d'injection automatique).
                     _cur_x_dz = real_info.get('x_pos', 0) if 'real_info' in locals() else 0
                     if (self._danger_zone_x is not None and
                             not _currently_jumping and
@@ -5529,17 +5613,15 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                             _not_replay_zone):
                         _dist_to_danger = self._danger_zone_x - _cur_x_dz
                         if 30 <= _dist_to_danger <= 150:
-                            self.action_queue.clear()
-                            self.action_queue.append({
-                                'macro_name': 'max_jump',
-                                'strategy': 'Reflex danger zone',
-                                'urgency': 10,
-                                'confidence': 95
-                            })
-                            if self.current_macro and self.current_macro.get('name') not in _JUMP_MACROS:
-                                self.current_macro['frames_left'] = 0
-                            print(f"DANGER ZONE REFLEX: trou connu a x={self._danger_zone_x}, "
-                                  f"Mario a x={_cur_x_dz} ({_dist_to_danger}px) -> max_jump")
+                            # Forcer un appel Claude avec le contexte de danger (pas d'injection auto)
+                            situation['danger_zone'] = {
+                                'x': self._danger_zone_x,
+                                'dist': int(_dist_to_danger),
+                            }
+                            if not self.claude_thinking:
+                                _scene_trigger = True
+                            print(f"DANGER ZONE: trou connu a x={self._danger_zone_x}, "
+                                  f"Mario a x={_cur_x_dz} ({_dist_to_danger}px) → Claude décide")
                         elif _cur_x_dz > self._danger_zone_x + 50:
                             self._danger_zone_x = None
 
@@ -5653,12 +5735,14 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 
                             # Sauvegarder immédiatement le run parfait de CE stage,
                             # avant la transition (évite que le stage suivant écrase l'historique).
+                            self._current_level_completed = True
                             self._save_perfect_run(self.current_world, self.current_level)
                             # Remettre à zéro l'historique pour que le stage suivant parte proprement.
                             self._final_action_history.clear()
                             self._raw_action_history.clear()
                             self._rewind_index = None
                             self._perfect_start_ram = None
+                            self._current_level_completed = False  # Reset pour le stage suivant
                             self._rewind_checkpoints = []
 
                             time.sleep(3)  # Pause pour admirer la victoire
@@ -5895,12 +5979,12 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
                                     f"REWIND PRE-SAUT : Mario est revenu a x={_post_rewind_x}, "
                                     f"avant le saut fatal.\n"
                                     f"   Il y a un TROU vers x={mario_x_death}.\n"
-                                    f"   Sauter IMMÉDIATEMENT avec max_jump.\n"
+                                    f"   Sauter avec run_jump_over px={_danger_dist} approach_px={max(0, _danger_dist - 20)} ou max_jump px={max(0, _danger_dist - 5)}.\n"
                                 ) if _death_cause == 'fell_in_hole' else ""
                                 _obligatoire = (
                                     f"SAUTE par-dessus la zone x={mario_x_death}"
                                     if _death_cause == 'enemy_hit'
-                                    else "max_jump IMMÉDIATEMENT (trou confirmé)"
+                                    else f"run_jump_over px={_danger_dist} approach_px={max(0, _danger_dist - 20)} (trou confirmé)"
                                     if _death_cause == 'fell_in_hole'
                                     else "Avance vite avant le timer"
                                 )
@@ -6130,7 +6214,7 @@ ENNEMIS DÉTECTÉS: {len(enemies)}"""
 
             self.logger.log_session_end(final_stats)
 
-            #  Sauvegarder le run parfait (historique tronqué aux rewinds)
+            #  Sauvegarder le run (les règles de protection sont dans _save_perfect_run)
             self._save_perfect_run()
 
             cv2.destroyAllWindows()

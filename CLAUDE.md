@@ -4,6 +4,12 @@
 - Ne jamais commiter ni pousser sur GitHub sans demande explicite
 - Ne pas utiliser d'emojis sauf si explicitement demandé
 
+## PRINCIPE FONDAMENTAL — NE JAMAIS VIOLER
+**Claude décide de TOUTES les actions. Aucune injection automatique d'action n'est autorisée.**
+- Interdiction absolue d'injecter automatiquement des macros (max_jump, run_jump_over, stomp_enemy, etc.) en réponse à des événements de jeu (ennemis détectés, trous détectés, danger zone, etc.)
+- Si une menace est détectée, le code peut déclencher un appel Claude urgent (`_scene_trigger = True`) mais NE DOIT PAS injecter d'action directement
+- Ajouter des réflexes automatiques casse totalement le principe du projet : c'est Claude qui joue, pas le code
+
 ## Commandes
 ```bash
 source .venv/bin/activate && python3 mario_fluid_llm.py   # lancer le jeu
@@ -28,30 +34,29 @@ env.step(current_action)  ← NE PAS appeler si current_action is None (PAUSE)
 → obs, reward, done, real_info
 → analyze_situation()      ← situation dict envoyé à Claude
 → call_claude_async()      ← thread async, remplit action_queue
-→ reflexes (stomp/trou)    ← synchrones, priorité absolue
 → get_current_action()     ← dépile action_queue → current_macro
 ```
 
 ### Macro actions (durées en frames NES)
 - `run_forward` : base_action=3 (right+B), 25f
-- `stomp_enemy` : base_action=2 (right+A), 20f — **géré par réflexe, Claude ne doit PAS l'utiliser**
+- `stomp_enemy` : base_action=2 (right+A), 20f — **converti en `run_jump_over` à la réception (Claude ne doit PAS l'utiliser)**
 - `pipe_jump`   : 2 phases — phase1: right 40f, phase2: right+A+B 40f
 - `obstacle_jump`: 2 phases similaires
-- `max_jump`    : base_action=4 (right+A+B), 30f
+- `max_jump`    : base_action=4 (right+A+B), 30f — **toujours avec `px` sauf trou immédiat (<20px)**
+- `run_jump_over`: marche `px` pixels puis saute — **toujours avec `px`**
 
-### Système réflexe (synchrone, priorité max)
-- **Stomp réflexe OAM** : lit l'OAM NES (RAM 0x0200+) → cherche sprites palette=3 (ennemis) à 15-70px devant Mario (sprite 1 X) → injecte `run_jump_over`. Cooldown : **25 frames**
-  - NB: Goombas sont RGB(228,92,16), Mario RGB(248,56,0) — couleurs DIFFÉRENTES, détection couleur ne marche pas
-  - L'OAM fournit les positions écran exactes avec le bit palette qui distingue Mario/ennemis
-- **Trou réflexe** : détecte absence de sol devant Mario → injecte `max_jump`. Cooldown : **15 frames**
-- Les réflexes ne se déclenchent PAS si current_macro est un saut (_JUMP_MACROS)
+### Détection de menaces (sans injection automatique)
+- L'OAM NES (RAM 0x0200+) permet de lire les positions d'ennemis (sprites palette=3) — utilisé pour informer Claude uniquement
+- NB: Goombas sont RGB(228,92,16), Mario RGB(248,56,0) — couleurs DIFFÉRENTES, détection couleur ne marche pas
+- Trou détecté → `_scene_trigger = True` → Claude appelé en urgence, PAS d'injection automatique
+- Ennemi détecté → `_scene_trigger = True` → Claude appelé en urgence, PAS d'injection automatique
 
 ### Règles critiques — NE PAS CASSER
 1. `stomp_enemy` planifié par Claude → **converti en `run_jump_over`** (saut plus fiable que stomp, couvre ~140px)
 2. `env.step()` non appelé si `current_action is None` → jeu gelé (PAUSE pendant que Claude pense)
 3. `inject_known_solution` : ne re-injecte pas si position n'a pas avancé de ≥40px (`_last_known_solution_x`)
 4. `inject_known_solution` : ne clear pas la queue si un jump macro est en cours ou planifié
-5. Stuck mode → reset `last_reflex_step = step_count` (force cooldown 25f)
+5. **Aucune injection automatique d'action** → toujours `_scene_trigger = True` si menace détectée
 
 ### Système MID-AIR — principe fondamental
 - **But unique** : ajuster l'atterrissage du saut en cours (où Mario va tomber), PAS planifier la suite
@@ -88,13 +93,13 @@ Confirmé fonctionnel. `_ram_buffer()` retourne un `np.ndarray` shape (2048,).
 
 ## Bugs connus / tentatives échouées
 - **stomp_enemy planifié par Claude** → toujours `stomp+run_forward` même après changement d'exemples dans le prompt. Fix : filtrage côté code (converti en run_forward à la réception)
-- **Cooldown réflexe 80f trop long** → Mario court 320px sans protection après un stomp. Fix : réduit à 25f
 - **inject_known_solution boucle infinie** : réinjectait `run_forward` en boucle. Fix : `_last_known_solution_x` cooldown 40px
-- **pipe_jump sabotage** : stomp reflex interrompait pipe_jump Phase 1. Fix : `_JUMP_MACROS` liste
+- **pipe_jump sabotage** : inject_known_solution écrasait pipe_jump. Fix : `_JUMP_MACROS` protection + cooldown 40px
+- **Réflexes automatiques** : injections automatiques de max_jump/run_jump_over → cassaient le principe du projet. Fix : supprimés, remplacés par `_scene_trigger = True`
+- **step_back faux positifs sur escaliers** : seuil 40px trop grand. Fix : réduit à 10px + détection hauteur (_height_gain > 15px = plateforme escaladée)
 
 ## Évolutions en cours (voir tâches)
-1. **Fix réflexe stomp** : Mario court encore dans les ennemis — vérifier si le réflexe se déclenche réellement (chercher "⚡ RÉFLEXE v3" dans console)
-2. **Rewind sur mort** : restaurer RAM 60f avant mort → appel Claude correctif → rejouer
+1. **Rewind sur mort** : restaurer RAM 60f avant mort → appel Claude correctif → rejouer
 
 ## Format logs
 ```
